@@ -1,0 +1,58 @@
+{
+  "manifest_version": 3,
+  "name": "Notch \u2014 Nova in your browser",
+  "short_name": "Notch",
+  "version": "1.1.0",
+  "description": "A Dynamic Island for Chrome. Nova, your AI, lives at the top of every page. Talk, ask, open sites, set timers.",
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "action": {
+    "default_title": "Notch: show or hide",
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png"
+    }
+  },
+  "background": {
+    "service_worker": "bg.js"
+  },
+  "permissions": [
+    "storage",
+    "tabs",
+    "alarms",
+    "notifications",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://opgitcuqwicuiplaptkm.supabase.co/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "notch.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "commands": {
+    "open-nova": {
+      "suggested_key": {
+        "default": "Alt+Shift+N",
+        "mac": "Alt+Shift+N"
+      },
+      "description": "Open Nova"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src https://opgitcuqwicuiplaptkm.supabase.co"
+  }
+}

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Notch">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" href="/icons/favicon-32.png">
+<title>Notch — Nova</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: #000; color: #fff; overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif; }
+  #sky { position: fixed; inset: 0; width: 100%; height: 100%; }
+  .glow { position: fixed; inset: 0; background: radial-gradient(ellipse at 50% -10%, rgba(255,138,61,.28), transparent 60%); pointer-events: none; }
+  .wrap { position: relative; height: 100%; max-width: 760px; margin: 0 auto; display: flex; flex-direction: column;
+    padding: calc(env(safe-area-inset-top) + 64px) 16px calc(env(safe-area-inset-bottom) + 12px); }
+
+  /* the island */
+  .isl { position: fixed; top: calc(env(safe-area-inset-top) + 10px); left: 50%; transform: translateX(-50%); z-index: 10;
+    background: #000; height: 37px; width: 126px; border-radius: 20px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 10px; cursor: pointer; overflow: hidden; border: 1px solid rgba(255,255,255,.06);
+    transition: width .55s cubic-bezier(.2,1.3,.3,1), height .55s cubic-bezier(.2,1.3,.3,1), border-radius .45s, box-shadow .4s; }
+  .isl.wide { width: 230px; }
+  .isl.glow2 { box-shadow: 0 0 0 1.5px rgba(255,138,61,.8), 0 0 24px rgba(255,138,61,.55); }
+  .isl.big { width: min(92vw, 420px); height: 84px; border-radius: 30px; padding: 0 16px; justify-content: flex-start; gap: 12px; }
+  .isl .r { font-size: 13px; font-weight: 700; color: #FFC28F; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .isl .bt { display: none; font-size: 15px; font-weight: 600; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+  .isl:not(.big) .bt { display: none; }
+  .isl.big .r { display: none; }
+  .eq i { display: inline-block; width: 3px; margin: 0 1px; background: #FF8A3D; border-radius: 2px; animation: eq .7s ease-in-out infinite alternate; vertical-align: middle; }
+  .eq.red i { background: #ff453a; }
+  .eq i:nth-child(2){animation-delay:.15s}.eq i:nth-child(3){animation-delay:.3s}.eq i:nth-child(4){animation-delay:.45s}
+  @keyframes eq { from { height: 4px } to { height: 16px } }
+
+  .hero { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: none; }
+  #big { width: 150px; height: 150px; }
+  .title { font-size: 22px; font-weight: 800; background: linear-gradient(90deg,#FF8A3D,#FFD9B8); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .timer { font-size: 32px; font-weight: 800; color: #FF8A3D; font-variant-numeric: tabular-nums; display: none; }
+  .chat { flex: 1; overflow-y: auto; padding: 10px 0; display: flex; flex-direction: column; gap: 8px; -webkit-overflow-scrolling: touch; }
+  .chat::-webkit-scrollbar { width: 0; }
+  .msg { max-width: 82%; padding: 10px 14px; border-radius: 18px; font-size: 17px; line-height: 1.35; white-space: pre-wrap; user-select: text; -webkit-user-select: text; }
+  .you { align-self: flex-end; background: rgba(255,138,61,.3); }
+  .nova { align-self: flex-start; background: rgba(255,255,255,.09); }
+  .empty { text-align: center; color: rgba(255,255,255,.55); margin-top: 24px; font-size: 16px; }
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 10px; flex: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+  .chip { flex: none; font-size: 15px; font-weight: 600; padding: 9px 14px; border-radius: 18px; background: rgba(255,255,255,.1); }
+  .chip:active, .rb:active { transform: scale(.92); }
+  .bar { flex: none; display: flex; align-items: center; gap: 8px; height: 58px; padding: 0 6px 0 18px; border-radius: 29px;
+    background: rgba(255,255,255,.08); position: relative; }
+  .bar::before { content: ""; position: absolute; inset: 0; border-radius: 29px; padding: 1.5px; pointer-events: none;
+    background: linear-gradient(90deg,#5A6BBF,#FF943F,#9ECCFF); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+  input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: #fff; font-size: 18px; }
+  input::placeholder { color: rgba(255,255,255,.45); }
+  .rb { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 19px; flex: none; transition: transform .15s; }
+  .mic { background: #FF8A3D; color: #000; }
+  .mic.on { background: #ff453a; color: #fff; }
+  .stop { background: #ff453a; display: none; font-size: 15px; }
+  .tag { font-size: 11px; font-weight: 900; color: #FF8A3D; align-self: center; display: none; flex: none; }
+  .tip { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 90px); background: #1c1c1e; border: 1px solid rgba(255,255,255,.12);
+    border-radius: 16px; padding: 12px 16px; font-size: 14px; max-width: 92vw; display: none; z-index: 20; }
+  @media (min-width: 768px) { #big { width: 190px; height: 190px; } .msg { font-size: 18px; } }
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas><div class="glow"></div>
+<div class="isl" id="isl"><canvas id="mini" width="52" height="52" style="width:26px;height:26px;flex:none"></canvas><span class="r" id="right"></span><span class="bt" id="btext"></span></div>
+<div class="wrap">
+  <div class="hero">
+    <canvas id="big" width="400" height="400"></canvas>
+    <div class="title" id="title">Hi, I'm Nova</div>
+    <div class="timer" id="tbig"></div>
+  </div>
+  <div class="chat" id="chat"></div>
+  <div class="chips">
+    <button class="chip" data-a="t5">⏱ 5 min</button>
+    <button class="chip" data-a="t1">⏱ 1 min</button>
+    <button class="chip" data-a="voice" id="voicechip">🔊 Voice on</button>
+    <button class="chip" data-a="new">＋ New chat</button>
+    <button class="chip" data-a="sign" id="signchip">✉︎ Sign in</button>
+    <button class="chip" data-a="install" id="installchip">⬇︎ Add to Home Screen</button>
+    <span class="tag" id="chattag">CHAT ON</span>
+  </div>
+  <div class="bar">
+    <input id="q" placeholder="Ask Nova…" autocomplete="off" enterkeyhint="send">
+    <button class="rb stop" id="stop" aria-label="Stop">■</button>
+    <button class="rb mic" id="mic" aria-label="Talk">🎙</button>
+  </div>
+</div>
+<div class="tip" id="tip"></div>
+<script src="/config.js"></script>
+<script src="/vendor/supabase.js"></script>
+<script src="/nova-core.js"></script>
+<script src="/nova.js"></script>
+<script src="/beacon.js"></script>
+<script src="/app/app.js"></script>
+</body>
+</html>

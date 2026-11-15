@@ -1,0 +1,11 @@
+.DS_Store
+mac/Notch.app/
+mac/core_tests
+mac/build_errors.txt
+mac/test_results.txt
+mac/build_archs.txt
+ios/NotchiOS.xcodeproj/
+ios/tools/
+ios/ios_*.txt
+node_modules/
+.netlify/

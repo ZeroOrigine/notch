@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="description" content="Notch puts Nova, your AI, in a Dynamic Island. On Mac, in Chrome, on iPhone and iPad.">
+<meta property="og:title" content="Notch — Nova in your notch">
+<meta property="og:description" content="Talk to Nova. Open apps. Set timers. On Mac, Chrome, iPhone and iPad.">
+<meta property="og:image" content="https://notch.zeroorigine.com/icons/icon-512.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" href="/icons/favicon-32.png">
+<title>Notch — Nova in your notch</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif; }
+  #sky { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
+  main { position: relative; z-index: 1; }
+  .glow { position: fixed; inset: 0; background: radial-gradient(ellipse at 50% 0%, rgba(255,138,61,.3), transparent 55%); pointer-events: none; z-index: 0; }
+  section { max-width: 1080px; margin: 0 auto; padding: 0 22px; }
+  .hero { min-height: 92vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 18px; padding-top: 70px; }
+  .isl { background: #000; border: 1px solid rgba(255,255,255,.08); height: 44px; width: 170px; border-radius: 24px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px;
+    transition: all .6s cubic-bezier(.2,1.3,.3,1); box-shadow: 0 10px 40px rgba(0,0,0,.6); overflow: hidden; margin-bottom: 10px; }
+  .isl.wide { width: 300px; }
+  .isl.glowing { box-shadow: 0 0 0 1.5px rgba(255,138,61,.8), 0 0 30px rgba(255,138,61,.55); }
+  .isl.big { width: min(90vw, 460px); height: 96px; border-radius: 34px; justify-content: flex-start; gap: 14px; padding: 0 18px; }
+  .isl .r { font-size: 14px; font-weight: 700; color: #FFC28F; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .isl .bt { font-size: 16px; font-weight: 600; text-align: left; display: none; }
+  .isl.big .bt { display: block; } .isl.big .r { display: none; }
+  .eq i { display: inline-block; width: 3px; margin: 0 1px; background: #FF8A3D; border-radius: 2px; animation: eq .7s ease-in-out infinite alternate; vertical-align: middle; }
+  .eq.red i { background: #ff453a; }
+  .eq i:nth-child(2){animation-delay:.15s}.eq i:nth-child(3){animation-delay:.3s}.eq i:nth-child(4){animation-delay:.45s}
+  @keyframes eq { from { height: 4px } to { height: 18px } }
+  #hstar { width: 220px; height: 220px; }
+  h1 { font-size: clamp(44px, 8vw, 92px); margin: 0; letter-spacing: -2px; line-height: 1;
+    background: linear-gradient(90deg,#fff 0%,#FFD9B8 45%,#FF8A3D 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { font-size: clamp(18px, 2.4vw, 24px); color: rgba(255,255,255,.75); max-width: 640px; margin: 0; line-height: 1.4; }
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+  a.btn { text-decoration: none; font-weight: 700; font-size: 17px; padding: 15px 26px; border-radius: 30px; transition: transform .15s; }
+  a.btn:active { transform: scale(.96); }
+  .primary { background: linear-gradient(90deg,#FF8A3D,#FFC28F); color: #000; }
+  .ghost { background: rgba(255,255,255,.1); color: #fff; border: 1px solid rgba(255,255,255,.15); }
+  h2 { font-size: clamp(30px, 4.5vw, 48px); text-align: center; margin: 90px 0 30px; letter-spacing: -1px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .card { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); border-radius: 24px; padding: 24px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .card .i { font-size: 34px; } .card h3 { font-size: 21px; margin: 12px 0 6px; } .card p { margin: 0; color: rgba(255,255,255,.7); font-size: 16px; line-height: 1.45; }
+  .dl .card { display: flex; flex-direction: column; gap: 10px; }
+  .dl .card a.btn { align-self: flex-start; font-size: 15px; padding: 11px 18px; margin-top: auto; }
+  .steps { font-size: 14px; color: rgba(255,255,255,.6); line-height: 1.5; margin: 0; padding-left: 18px; }
+  footer { text-align: center; color: rgba(255,255,255,.45); padding: 80px 20px 50px; font-size: 14px; }
+  footer a { color: #FFC28F; text-decoration: none; }
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas><div class="glow"></div>
+<main>
+<section class="hero">
+  <div class="isl" id="isl"><canvas id="mini" width="60" height="60" style="width:30px;height:30px;flex:none"></canvas><span class="r" id="right"></span><span class="bt" id="bt"></span></div>
+  <canvas id="hstar" width="440" height="440"></canvas>
+  <h1>Notch</h1>
+  <p class="sub">Nova, your AI, lives in a Dynamic Island. Talk to it. It opens apps, sets timers and answers in a second.</p>
+  <div class="cta">
+    <a class="btn primary" href="/app/">Open Notch now</a>
+    <a class="btn ghost" href="#get">Get it for your device</a>
+  </div>
+</section>
+
+<section>
+  <h2>Small. Smart. Always there.</h2>
+  <div class="grid">
+    <div class="card"><div class="i">🎙</div><h3>Just talk</h3><p>Tap the mic and speak. Nova answers out loud, then keeps listening. Say “thanks” to stop.</p></div>
+    <div class="card"><div class="i">⚡️</div><h3>It does things</h3><p>“Open YouTube.” “Set a 5 minute timer.” “Search for pizza near me.” Done.</p></div>
+    <div class="card"><div class="i">🧠</div><h3>It remembers</h3><p>Your chat is saved on your device. Say “remember that…” and Nova keeps it.</p></div>
+    <div class="card"><div class="i">✨</div><h3>Alive</h3><p>A spinning 3D Nova star, twinkling stars, shooting stars, and an island that glows when Nova talks.</p></div>
+  </div>
+</section>
+
+<section id="get" class="dl">
+  <h2>Get Notch</h2>
+  <div class="grid">
+    <div class="card"><div class="i">📱</div><h3>iPhone &amp; iPad</h3>
+      <p>Works now in Safari.</p>
+      <ol class="steps"><li>Open notch.zeroorigine.com/app</li><li>Tap Share ⬆︎</li><li>Tap “Add to Home Screen”</li></ol>
+      <a class="btn primary" href="/app/">Open on this device</a></div>
+    <div class="card"><div class="i">🌐</div><h3>Chrome</h3>
+      <p>The notch sits on top of every website.</p>
+      <ol class="steps"><li>Download and unzip</li><li>Open chrome://extensions, turn on Developer mode</li><li>Click “Load unpacked”, pick the folder</li></ol>
+      <a class="btn ghost" href="/downloads/Notch-Chrome.zip" download>Download for Chrome</a></div>
+    <div class="card"><div class="i">💻</div><h3>Mac</h3>
+      <p>The real notch: system controls, voice, and Nova uses apps for you. Touch ID guards anything that sends, deletes or pays.</p>
+      <ol class="steps"><li>Coming soon as a signed, Apple-checked download</li><li>Until then, use the web app on your Mac</li></ol>
+      <a class="btn ghost" href="/app/">Open web app</a></div>
+    <div class="card"><div class="i">🖥</div><h3>Windows, Android, any computer</h3>
+      <p>Open the web app in Chrome or Edge, then click the install icon in the address bar.</p>
+      <a class="btn ghost" href="/app/">Open web app</a></div>
+  </div>
+</section>
+
+<footer>Notch · Nova by <a href="https://zeroorigine.com">ZeroOrigine</a> · <a href="/privacy.html">Privacy</a></footer>
+</main>
+<script src="/config.js"></script>
+<script src="/nova.js"></script>
+<script src="/beacon.js"></script>
+<script src="/home.js"></script>
+</body>
+</html>
