@@ -282,7 +282,9 @@ struct GlassDrop: View {
     }
 }
 
-/// Nova's avatar: the island glass at avatar size.
+/// Nova's avatar: the new Siri. A clear glass sphere with ribbons of light waving inside,
+/// resting on a flowing rainbow (the rainbow shows from 44 points up, where there is room for it).
+/// `fast` = Nova is thinking or speaking: the light moves quicker and the waves grow.
 struct Orb: View {
     var size: CGFloat = 64
     var fast = false
@@ -290,10 +292,96 @@ struct Orb: View {
         Color(red: 1.0, green: 0.36, blue: 0.40), Color(red: 1.0, green: 0.72, blue: 0.30), Color(red: 1.0, green: 0.95, blue: 0.50),
         Color(red: 0.40, green: 0.95, blue: 0.62), Color(red: 0.36, green: 0.76, blue: 1.0), Color(red: 0.66, green: 0.48, blue: 1.0),
     ]
+    // inside the sphere: colour, height of the wave, speed, thickness, vertical place, phase
+    static let inner: [(Color, Double, Double, Double, Double, Double)] = [
+        (Color(red: 1.0, green: 0.25, blue: 0.30), 0.16, 1.1, 0.13, 0.22, 0.0),   // red
+        (Color(red: 0.25, green: 0.45, blue: 1.0), 0.18, 1.4, 0.14, 0.20, 2.1),   // blue
+        (Color(red: 0.85, green: 0.35, blue: 1.0), 0.14, 1.7, 0.12, 0.14, 4.0),   // violet
+        (Color.white, 0.12, 1.25, 0.09, 0.06, 1.0),                               // white core
+    ]
+    // the ground ribbon, top to bottom
+    static let ground: [Color] = [
+        Color(red: 0.25, green: 0.50, blue: 1.0), Color(red: 0.35, green: 0.95, blue: 0.75), Color(red: 1.0, green: 0.95, blue: 0.55),
+        Color.white, Color(red: 1.0, green: 0.65, blue: 0.30), Color(red: 1.0, green: 0.30, blue: 0.25),
+    ]
+
+    /// A band between two curves that tapers to a point at both ends.
+    static func band(_ x0: Double, _ x1: Double, _ mid: (Double) -> Double, _ half: Double) -> Path {
+        var p = Path()
+        let n = 48
+        func h(_ u: Double) -> Double { half * pow(sin(Double.pi * u), 0.8) }
+        for i in 0...n {
+            let u = Double(i) / Double(n), x = x0 + (x1 - x0) * u
+            let pt = CGPoint(x: x, y: mid(x) - h(u))
+            if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+        }
+        for i in stride(from: n, through: 0, by: -1) {
+            let u = Double(i) / Double(n), x = x0 + (x1 - x0) * u
+            p.addLine(to: CGPoint(x: x, y: mid(x) + h(u)))
+        }
+        p.closeSubpath()
+        return p
+    }
+
     var body: some View {
-        GlassDrop(width: size, height: size * 0.72, fast: fast)
+        TimelineView(.animation) { tl in
+            let t = tl.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 10000)
+            let k: Double = fast ? 1 : 0
+            Canvas { ctx, sz in
+                let W = Double(sz.width)
+                let withGround = W >= 44
+                let r = W * (withGround ? 0.34 : 0.46)
+                let cx = W / 2, cy = withGround ? W * 0.40 : W / 2
+                let c = CGPoint(x: cx, y: cy)
+                let ball = Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+                let speed = 1 + k * 2.2
+
+                // ground ribbon, behind the sphere
+                if withGround {
+                    var gg = ctx
+                    gg.addFilter(.blur(radius: W * 0.022))
+                    gg.blendMode = .plusLighter
+                    let base = W * 0.80, x0 = W * 0.02, x1 = W * 0.98
+                    for (i, col) in Orb.ground.enumerated() {
+                        let off = (Double(i) - 2.5) * W * 0.022
+                        let path = Orb.band(x0, x1, { x in
+                            base + off + sin(x / W * 5.2 - t * 0.9 * speed + Double(i) * 0.25) * W * 0.05 - (x - W / 2) * 0.06
+                        }, W * 0.022)
+                        gg.fill(path, with: .color(col.opacity(0.75)))
+                    }
+                }
+                // dark glass body
+                ctx.fill(ball, with: .radialGradient(Gradient(colors: [Color(white: 0.09), Color.black.opacity(0.92)]),
+                                                     center: c, startRadius: 0, endRadius: r))
+                // light ribbons inside
+                var inn = ctx
+                inn.clip(to: ball)
+                inn.blendMode = .plusLighter
+                inn.addFilter(.blur(radius: r * 0.07))
+                for (col, amp, sp, th, y, ph) in Orb.inner {
+                    let a = amp * (1 + 0.6 * k)
+                    let path = Orb.band(cx - r, cx + r, { x in
+                        cy + y * r + sin((x - cx) / r * 2.4 + t * sp * speed + ph) * a * r
+                    }, th * r * (1 + 0.3 * k * sin(t * 6 + ph)))
+                    inn.fill(path, with: .color(col.opacity(col == Color.white ? 0.9 : 0.8)))
+                }
+                // glass rim: faint at the top, bright at the bottom
+                ctx.stroke(ball, with: .linearGradient(Gradient(colors: [Color.white.opacity(0.18), Color.white.opacity(0.12), Color.white.opacity(0.85)]),
+                                                       startPoint: CGPoint(x: cx, y: cy - r), endPoint: CGPoint(x: cx, y: cy + r)),
+                           lineWidth: max(0.6, r * 0.035))
+                // colour bending at the edges: red on the left, blue on the right
+                var edge = ctx
+                edge.blendMode = .plusLighter
+                edge.addFilter(.blur(radius: max(0.4, r * 0.035)))
+                var left = Path(); left.addArc(center: c, radius: r * 0.97, startAngle: .degrees(100), endAngle: .degrees(200), clockwise: false)
+                var right = Path(); right.addArc(center: c, radius: r * 0.97, startAngle: .degrees(-20), endAngle: .degrees(80), clockwise: false)
+                edge.stroke(left, with: .color(Color(red: 1, green: 0.3, blue: 0.3).opacity(0.75)), lineWidth: max(0.8, r * 0.06))
+                edge.stroke(right, with: .color(Color(red: 0.35, green: 0.55, blue: 1).opacity(0.75)), lineWidth: max(0.8, r * 0.06))
+            }
             .frame(width: size, height: size)
-            .accessibilityLabel("Nova")
+            .scaleEffect(1 + (fast ? 0.03 * sin(t * 5) : 0.012 * sin(t * 1.6)))
+        }
+        .accessibilityLabel("Nova")
     }
 }
 
