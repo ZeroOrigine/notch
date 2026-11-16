@@ -218,9 +218,9 @@ final class CalendarService {
 // Look: dark glass on top, light caught in the bottom, a prism streak that slides, a bright lip.
 // `fast` = Nova is thinking or speaking: the light moves quicker and the glass wobbles like liquid.
 
-/// A superellipse. n = 2 is an ellipse; higher n is squarer. 3.6 matches the iPhone island.
+/// A superellipse. n = 2 is an ellipse; higher n is squarer. 2.7 matches the iPhone island.
 struct Squircle: Shape {
-    var n: Double = 3.6
+    var n: Double = 2.7
     func path(in r: CGRect) -> Path {
         var p = Path()
         let a = Double(r.width) / 2, b = Double(r.height) / 2, cx = Double(r.midX), cy = Double(r.midY)
