@@ -6,8 +6,8 @@
  <key>CFBundleIdentifier</key><string>com.notch.app</string>
  <key>CFBundleExecutable</key><string>Notch</string>
  <key>CFBundlePackageType</key><string>APPL</string>
- <key>CFBundleShortVersionString</key><string>5.0</string>
- <key>CFBundleVersion</key><string>2</string>
+ <key>CFBundleShortVersionString</key><string>5.1</string>
+ <key>CFBundleVersion</key><string>3</string>
  <key>LSMinimumSystemVersion</key><string>13.0</string>
  <key>CFBundleIconFile</key><string>AppIcon</string>
  <key>NSHighResolutionCapable</key><true/>
@@ -15,6 +15,7 @@
  <key>NSSpeechRecognitionUsageDescription</key><string>Notch turns your voice into commands.</string>
  <key>NSCameraUsageDescription</key><string>Notch uses the camera on this Mac only, to see if you are there and to guard your screen.</string>
  <key>NSBluetoothAlwaysUsageDescription</key><string>Notch turns Bluetooth on and off for you.</string>
- <key>NSCalendarsUsageDescription</key><string>Notch reads today's events for your morning briefing.</string>
+ <key>NSCalendarsUsageDescription</key><string>Nova reads your events (never changes them) for your briefing and when you ask about your day.</string>
+ <key>NSCalendarsFullAccessUsageDescription</key><string>Nova reads your events (never changes them) for your briefing and when you ask about your day.</string>
  <key>NSAppleEventsUsageDescription</key><string>Notch controls Music, Spotify, Mail and system settings for you.</string>
 </dict></plist>

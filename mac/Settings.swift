@@ -29,6 +29,8 @@ final class Prefs: ObservableObject {
     @Published var faceWake = Prefs.b("faceWake", false) { didSet { save("faceWake", faceWake) } }
     @Published var shoulderGuard = Prefs.b("shoulderGuard", false) { didSet { save("shoulderGuard", shoulderGuard) } }
     @Published var autoLock = Prefs.b("autoLock", false) { didSet { save("autoLock", autoLock) } }
+    @Published var stealth = Prefs.b("stealth", false) { didSet { save("stealth", stealth) } }
+    @Published var screenGlow = Prefs.b("screenGlow", true) { didSet { save("screenGlow", screenGlow) } }
     @Published var weather = Prefs.b("weather", true) { didSet { save("weather", weather) } }
     @Published var clipboard = Prefs.b("clipboard", true) { didSet { save("clipboard", clipboard) } }
     @Published var openAtLogin = Prefs.b("openAtLogin", false) { didSet { save("openAtLogin", openAtLogin) } }
@@ -40,7 +42,7 @@ final class Prefs: ObservableObject {
     @Published var translateFrom = UserDefaults.standard.string(forKey: "translateFrom") ?? "es-ES" { didSet { save("translateFrom", translateFrom) } }
 
     var summary: String {
-        "hoverOpen=\(hoverOpen) liveMusic=\(liveMusic) fileDrop=\(fileDrop) haptics=\(haptics) sounds=\(sounds) voiceReply=\(voiceReply) screenVision=\(screenVision) wakeWord=\(wakeWord) faceWake=\(faceWake) shoulderGuard=\(shoulderGuard) autoLock=\(autoLock) weather=\(weather) translateFrom=\(translateFrom)"
+        "hoverOpen=\(hoverOpen) liveMusic=\(liveMusic) fileDrop=\(fileDrop) haptics=\(haptics) sounds=\(sounds) voiceReply=\(voiceReply) screenVision=\(screenVision) wakeWord=\(wakeWord) faceWake=\(faceWake) shoulderGuard=\(shoulderGuard) autoLock=\(autoLock) stealth=\(stealth) screenGlow=\(screenGlow) weather=\(weather) translateFrom=\(translateFrom)"
     }
 }
 
@@ -196,6 +198,10 @@ struct SettingsView: View {
 
     var features: some View {
         Form {
+            Section("Screen privacy") {
+                row("Screen guard", "Blurs your whole screen when a second face looks over your shoulder. Uses this Mac's camera, nothing leaves the Mac. Also in the menu bar, the Controls tab, or say “screen guard on”.", $p.shoulderGuard)
+                row("Hide Notch from screen sharing", "Screenshots and shared screens (Zoom, Teams, Meet) skip Notch and your chats with Nova. A few newer capture apps may still see it.", $p.stealth)
+            }
             Section("Notch") {
                 Picker("Notch size", selection: $p.scale) {
                     Text("Small").tag(0.7)
@@ -212,7 +218,6 @@ struct SettingsView: View {
             }
             Section("Camera features (camera light stays on)") {
                 row("Wake on look", "Greets you when you sit down.", $p.faceWake)
-                row("Shoulder guard", "Hides the screen when a second face appears.", $p.shoulderGuard)
                 row("Auto-lock", "Locks the Mac 30 seconds after you walk away.", $p.autoLock)
             }
             Section("Microphone features") {
@@ -224,6 +229,7 @@ struct SettingsView: View {
                 row("Open Notch when the Mac starts", "", $p.openAtLogin)
                 row("Let Nova use apps for you", "Clicks and types inside apps. Needs a Claude key, Accessibility and Screen Recording. Asks Touch ID before send, delete, buy or pay.", $p.useApps)
                 row("Starfield and shooting stars", "", $p.stars)
+                row("Glowing screen edge", "A rainbow light around the screen while Nova listens or talks, like the new Siri.", $p.screenGlow)
             }
         }.formStyle(.grouped).scrollContentBackground(.hidden)
     }

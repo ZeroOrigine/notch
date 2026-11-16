@@ -122,8 +122,20 @@ extension ToolRegistry {
                        label: { _ in "Remembering" })) { i in Memory.add(i.str("fact")); return "Remembered" }
         r.add(ToolSpec(name: "forget", description: "Forget remembered facts that contain this text.", params: p(("text", s)), required: ["text"],
                        label: { _ in "Forgetting" })) { i in "Forgot \(Memory.forget(i.str("text"))) fact(s)" }
-        r.add(ToolSpec(name: "get_weather", description: "Get the current local weather.", returnsInfo: true, label: { _ in "Checking weather" })) { _ in
-            g.weatherText.isEmpty ? "Weather is not available right now" : g.weatherText
+        r.add(ToolSpec(name: "get_weather",
+                       description: "Weather for any place and day: now, hourly forecast up to 16 days ahead, or recorded history back to 1940. place: empty for the user's location. date: today, tomorrow, yesterday, a weekday, 'in 3 days', '2 weeks ago', '1 year ago' or YYYY-MM-DD. hour: e.g. 3pm, 15 or morning for one hour; empty for the whole day.",
+                       params: p(("place", s), ("date", s), ("hour", s)), returnsInfo: true,
+                       label: { $0.str("place").isEmpty ? "Checking weather" : "Checking weather in \($0.str("place"))" })) { i in
+            await WeatherService.shared.report(place: i.str("place"), day: i.str("date"), hour: i.str("hour"))
+        }
+        r.add(ToolSpec(name: "get_calendar",
+                       description: "Read the user's calendar events (every calendar in the Mac Calendar app, including Google and iCloud). date: today, tomorrow, a weekday or YYYY-MM-DD. days: how many days, 1 to 31. Use it for briefings and 'what is on my day'.",
+                       params: p(("date", s), ("days", n)), returnsInfo: true, label: { _ in "Reading your calendar" })) { i in
+            await CalendarService.shared.agenda(day: i.str("date"), days: Int(i.num("days", 1)))
+        }
+        r.add(ToolSpec(name: "set_screen_guard", description: "Turn the screen guard on or off. When on, the camera hides the screen if someone looks over the user's shoulder.",
+                       params: p(("on", b)), required: ["on"], label: { $0.bool("on") ? "Turning screen guard on" : "Turning screen guard off" })) { i in
+            g.setScreenGuard(i.bool("on"))
         }
         r.add(ToolSpec(name: "run_shortcut", description: "Run a macOS Shortcut by exact name.", params: p(("name", s), ("input", s)), required: ["name"],
                        label: { "Running “\($0.str("name"))”" })) { i in

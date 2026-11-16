@@ -124,3 +124,107 @@ enum NotchWire {
         return .answer(reply: reply, actions: acts)
     }
 }
+
+// MARK: - Day and hour reading (for weather and calendar tools)
+
+enum DayParse {
+    /// "today", "tomorrow", "yesterday", "in 3 days", "3 days ago", a weekday name (next one) or YYYY-MM-DD. Empty means today.
+    static func date(_ raw: String, now: Date, cal: Calendar = .current) -> Date? {
+        let s = raw.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let today = cal.startOfDay(for: now)
+        if s.isEmpty || s == "today" || s == "now" || s == "tonight" { return today }
+        if s == "tomorrow" { return cal.date(byAdding: .day, value: 1, to: today) }
+        if s == "yesterday" { return cal.date(byAdding: .day, value: -1, to: today) }
+        let nums = s.components(separatedBy: CharacterSet.decimalDigits.inverted).compactMap { Int($0) }
+        if s.hasPrefix("in "), s.contains("day"), let n = nums.first { return cal.date(byAdding: .day, value: n, to: today) }
+        if s.hasSuffix("ago"), s.contains("day"), let n = nums.first { return cal.date(byAdding: .day, value: -n, to: today) }
+        if s.hasSuffix("ago"), s.contains("week"), let n = nums.first { return cal.date(byAdding: .day, value: -7 * n, to: today) }
+        if s.hasSuffix("ago"), s.contains("year"), let n = nums.first { return cal.date(byAdding: .year, value: -n, to: today) }
+        let days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+        if let i = days.firstIndex(where: { s.contains($0) }) {
+            let wd = cal.component(.weekday, from: today) - 1
+            var add = (i - wd + 7) % 7
+            if add == 0 { add = s.contains("next") ? 7 : 0 }
+            return cal.date(byAdding: .day, value: add, to: today)
+        }
+        let f = DateFormatter()
+        f.calendar = cal; f.timeZone = cal.timeZone; f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"
+        if let d = f.date(from: String(s.prefix(10))) { return cal.startOfDay(for: d) }
+        return nil
+    }
+
+    /// "15", "3pm", "3 pm", "15:30", "9am", "noon", "midnight", "morning". nil when no hour was given.
+    static func hour(_ raw: String) -> Int? {
+        let s = raw.lowercased().replacingOccurrences(of: " ", with: "").replacingOccurrences(of: ".", with: "")
+        if s.isEmpty { return nil }
+        let named = ["midnight": 0, "morning": 8, "noon": 12, "midday": 12, "afternoon": 15, "evening": 18, "night": 21]
+        if let h = named[s] { return h }
+        let digits = s.prefix { $0.isNumber }
+        guard let h = Int(digits), h >= 0, h <= 23 else { return nil }
+        if s.hasSuffix("pm") { return h == 12 ? 12 : (h < 12 ? h + 12 : nil) }
+        if s.hasSuffix("am") { return h == 12 ? 0 : (h < 12 ? h : nil) }
+        return h
+    }
+
+    static func iso(_ d: Date, cal: Calendar = .current) -> String {
+        let f = DateFormatter()
+        f.calendar = cal; f.timeZone = cal.timeZone; f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: d)
+    }
+}
+
+// MARK: - Weather words (WMO weather codes used by Open-Meteo)
+
+enum WeatherWords {
+    static func describe(_ code: Int) -> String {
+        switch code {
+        case 0: return "clear"
+        case 1: return "mostly clear"
+        case 2: return "partly cloudy"
+        case 3: return "cloudy"
+        case 45, 48: return "fog"
+        case 51, 53, 55: return "drizzle"
+        case 56, 57: return "freezing drizzle"
+        case 61: return "light rain"
+        case 63: return "rain"
+        case 65: return "heavy rain"
+        case 66, 67: return "freezing rain"
+        case 71: return "light snow"
+        case 73: return "snow"
+        case 75: return "heavy snow"
+        case 77: return "snow grains"
+        case 80, 81: return "rain showers"
+        case 82: return "heavy showers"
+        case 85, 86: return "snow showers"
+        case 95: return "thunderstorm"
+        case 96, 99: return "thunderstorm with hail"
+        default: return "unknown"
+        }
+    }
+    static func icon(_ code: Int, night: Bool) -> String {
+        switch code {
+        case 0, 1: return night ? "moon.stars.fill" : "sun.max.fill"
+        case 2: return night ? "cloud.moon.fill" : "cloud.sun.fill"
+        case 3: return "cloud.fill"
+        case 45, 48: return "cloud.fog.fill"
+        case 51...67, 80...82: return "cloud.rain.fill"
+        case 71...77, 85, 86: return "snowflake"
+        case 95...99: return "cloud.bolt.fill"
+        default: return "cloud.fill"
+        }
+    }
+    /// "3 PM" style label for an hour 0-23.
+    static func hourLabel(_ h: Int) -> String {
+        h == 0 ? "12 AM" : h < 12 ? "\(h) AM" : h == 12 ? "12 PM" : "\(h - 12) PM"
+    }
+    /// One spoken line for one hour. rainChance is nil for past days (history has no chance, only amount).
+    static func line(hour: Int, temp: Double, feels: Double?, code: Int, rainChance: Double?, rainMM: Double?, wind: Double?) -> String {
+        var s = "\(hourLabel(hour)) \(Int(temp.rounded()))°C"
+        if let f = feels, abs(f - temp) >= 2 { s += " (feels \(Int(f.rounded()))°C)" }
+        s += ", \(describe(code))"
+        if let c = rainChance, c >= 20 { s += ", \(Int(c))% chance of rain" }
+        if let m = rainMM, m >= 0.2 { s += ", \(String(format: "%.1f", m)) mm" }
+        if let w = wind, w >= 25 { s += ", wind \(Int(w.rounded())) km/h" }
+        return s
+    }
+}

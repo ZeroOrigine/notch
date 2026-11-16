@@ -69,6 +69,33 @@ func check(_ ok: Bool, _ name: String, file: String = #file, line: Int = #line) 
         let bad = NotchWire.parse(status: 500, data: Data("not json".utf8))
         if case .refused(let m) = bad { check(m.contains("500"), "parse garbage") } else { check(false, "parse garbage") }
 
+
+        // DayParse
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "America/Toronto")!
+        let mon = DayParse.date("2026-11-16", now: Date(), cal: cal)!   // a Monday
+        check(DayParse.iso(DayParse.date("", now: mon, cal: cal)!, cal: cal) == "2026-11-16", "empty is today")
+        check(DayParse.iso(DayParse.date("tomorrow", now: mon, cal: cal)!, cal: cal) == "2026-11-17", "tomorrow")
+        check(DayParse.iso(DayParse.date("yesterday", now: mon, cal: cal)!, cal: cal) == "2026-11-15", "yesterday")
+        check(DayParse.iso(DayParse.date("in 3 days", now: mon, cal: cal)!, cal: cal) == "2026-11-19", "in 3 days")
+        check(DayParse.iso(DayParse.date("2 weeks ago", now: mon, cal: cal)!, cal: cal) == "2026-11-02", "2 weeks ago")
+        check(DayParse.iso(DayParse.date("1 year ago", now: mon, cal: cal)!, cal: cal) == "2025-11-16", "1 year ago")
+        check(DayParse.iso(DayParse.date("friday", now: mon, cal: cal)!, cal: cal) == "2026-11-20", "friday")
+        check(DayParse.iso(DayParse.date("monday", now: mon, cal: cal)!, cal: cal) == "2026-11-16", "monday is today")
+        check(DayParse.iso(DayParse.date("next monday", now: mon, cal: cal)!, cal: cal) == "2026-11-23", "next monday")
+        check(DayParse.iso(DayParse.date("1995-07-04", now: mon, cal: cal)!, cal: cal) == "1995-07-04", "iso date")
+        check(DayParse.date("blue", now: mon, cal: cal) == nil, "junk date is nil")
+        check(DayParse.hour("3pm") == 15 && DayParse.hour("3 PM") == 15 && DayParse.hour("12am") == 0 && DayParse.hour("12pm") == 12, "am/pm hours")
+        check(DayParse.hour("15:30") == 15 && DayParse.hour("9") == 9 && DayParse.hour("noon") == 12 && DayParse.hour("evening") == 18, "24h and named hours")
+        check(DayParse.hour("") == nil && DayParse.hour("25") == nil && DayParse.hour("13pm") == nil, "bad hours are nil")
+
+        // WeatherWords
+        check(WeatherWords.describe(0) == "clear" && WeatherWords.describe(63) == "rain" && WeatherWords.describe(1234) == "unknown", "weather codes")
+        check(WeatherWords.hourLabel(0) == "12 AM" && WeatherWords.hourLabel(13) == "1 PM" && WeatherWords.hourLabel(12) == "12 PM", "hour labels")
+        let wl = WeatherWords.line(hour: 15, temp: 2.4, feels: -1.6, code: 61, rainChance: 70, rainMM: 0.8, wind: 31)
+        check(wl == "3 PM 2°C (feels -2°C), light rain, 70% chance of rain, 0.8 mm, wind 31 km/h", "weather line: " + wl)
+        check(WeatherWords.line(hour: 9, temp: 10, feels: 10.5, code: 0, rainChance: 5, rainMM: 0, wind: 5) == "9 AM 10°C, clear", "calm line")
+        check(!wl.contains("—") && !wl.contains("–"), "no dashes in weather")
+
         print("TESTS: \(passed) passed, \(failed) failed")
         exit(failed == 0 ? 0 : 1)
     }

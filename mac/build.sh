@@ -2,7 +2,7 @@
 # Builds Notch.app next to this script. Needs Xcode Command Line Tools (xcode-select --install).
 # 1) runs unit tests, 2) builds for Apple chips and Intel, 3) joins them into one universal app.
 cd "$(dirname "$0")"
-SRC=(Notch.swift Features.swift Settings.swift MainWindow.swift Core.swift Tools.swift Brains.swift)
+SRC=(Notch.swift Features.swift Settings.swift MainWindow.swift Core.swift Tools.swift Brains.swift Insight.swift)
 : > build_errors.txt
 
 echo "▸ Running tests…"

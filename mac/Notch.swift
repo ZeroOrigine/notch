@@ -372,6 +372,7 @@ final class Nova: ObservableObject {
         if prefs.wakeWord { if !listening { wake.start() } } else { wake.stop() }
         if !prefs.weather { weatherText = "" } else if weatherText.isEmpty { fetchWeather() }
         LoginItem.set(prefs.openAtLogin)
+        AppDelegate.shared?.applyStealth()
     }
 
     // MARK: chat mode, stop, transcript
@@ -490,27 +491,10 @@ final class Nova: ObservableObject {
 
     func fetchWeather() {
         guard prefs.weather else { weatherText = ""; return }
-        guard let url = URL(string: "https://wttr.in/?format=%25t%7C%25C%7C%25l") else { return }
         Task { @MainActor in
-            guard let (d, _) = try? await URLSession.shared.data(from: url),
-                  let raw = String(data: d, encoding: .utf8), raw.count < 140 else { return }
-            let p = raw.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: "|")
-            guard p.count >= 3, p[0].contains("°") else { return }
-            let temp = p[0].replacingOccurrences(of: "+", with: "")
-            let cond = p[1]
-            let place = p[2].components(separatedBy: ",").first ?? ""
-            let c = cond.lowercased()
-            let h = Calendar.current.component(.hour, from: Date())
-            let night = h >= 19 || h < 6
-            var icon = night ? "moon.stars.fill" : "sun.max.fill"
-            if c.contains("thunder") { icon = "cloud.bolt.fill" }
-            else if c.contains("snow") || c.contains("sleet") || c.contains("blizzard") || c.contains("ice") { icon = "snowflake" }
-            else if c.contains("rain") || c.contains("drizzle") || c.contains("shower") { icon = "cloud.rain.fill" }
-            else if c.contains("fog") || c.contains("mist") || c.contains("haze") { icon = "cloud.fog.fill" }
-            else if c.contains("partly") { icon = night ? "cloud.moon.fill" : "cloud.sun.fill" }
-            else if c.contains("cloud") || c.contains("overcast") { icon = "cloud.fill" }
-            self.weatherIcon = icon
-            self.weatherText = "\(temp) · \(cond)" + (place.isEmpty ? "" : " · \(place.capitalized)")
+            guard let w = await WeatherService.shared.current() else { return }
+            self.weatherText = w.text
+            self.weatherIcon = w.icon
         }
     }
 
@@ -550,7 +534,11 @@ final class Nova: ObservableObject {
         if t.contains("battery") {
             let b = Sys.battery(); return "Battery is at \(b.0) percent\(b.1 ? ", and charging" : "")."
         }
-        if t.contains("weather"), !weatherText.isEmpty { return "It is " + weatherText.replacingOccurrences(of: " · ", with: ", ") + "." }
+        if ["weather", "the weather", "weather now", "what is the weather", "what's the weather", "whats the weather", "how is the weather", "how's the weather"].contains(t),
+           !weatherText.isEmpty { return "It is " + weatherText.replacingOccurrences(of: " · ", with: ", ") + "." }
+        if t.contains("screen guard") || t.contains("shoulder guard") || t.contains("guard my screen") {
+            return setScreenGuard(!(t.contains(" off") || t.contains("stop") || t.contains("disable") || t.contains("turn off")))
+        }
         for p in ["open ", "launch ", "start ", "go to "] where t.hasPrefix(p) {
             let rest = String(t.dropFirst(p.count)).replacingOccurrences(of: " and ", with: ",").replacingOccurrences(of: " then ", with: ",")
             var done: [String] = []
@@ -646,38 +634,25 @@ final class Nova: ObservableObject {
         later(1.2) { if self.copied == s { self.copied = "" } }
     }
 
-    // MARK: morning briefing
+    // MARK: screen guard
+    func setScreenGuard(_ on: Bool) -> String {
+        prefs.shoulderGuard = on
+        Log.add("Screen guard \(on ? "on" : "off")")
+        return on ? "Screen guard is on. I will hide your screen if someone looks over your shoulder." : "Screen guard is off."
+    }
+
+    // MARK: morning briefing (time, battery, weather, calendar)
     func briefing() -> String {
         let f = DateFormatter(); f.dateFormat = "h:mm a, EEEE d MMMM"
         let b = Sys.battery()
-        var base = "\(greeting()). It is \(f.string(from: Date()))."
-        if !weatherText.isEmpty { base += " Weather: " + weatherText.replacingOccurrences(of: " · ", with: ", ") + "." }
-        base += " Battery is at \(b.0) percent\(b.1 ? ", charging" : "")."
+        let base = "\(greeting()). It is \(f.string(from: Date())). Battery is at \(b.0) percent\(b.1 ? ", charging" : "")."
         Log.add("Briefing")
-        DispatchQueue.global().async {
-            let r = run("/usr/bin/osascript", ["-e", """
-            tell application "Calendar"
-              set d0 to current date
-              set time of d0 to 0
-              set d1 to d0 + (1 * days)
-              set out to ""
-              repeat with c in calendars
-                repeat with e in (every event of c whose start date is greater than or equal to d0 and start date is less than d1)
-                  set out to out & (summary of e) & " at " & (time string of (start date of e)) & "|"
-                end repeat
-              end repeat
-              return out
-            end tell
-            """])
-            let events = r.out.components(separatedBy: "|").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-            let line: String
-            if r.code != 0 { line = "I could not read your calendar." }
-            else if events.isEmpty { line = "You have no events today." }
-            else { line = "You have \(events.count) event\(events.count == 1 ? "" : "s") today: " + events.prefix(5).joined(separator: ", ") + "." }
-            onMain {
-                self.reply = base + " " + line
-                if self.prefs.voiceReply { let u = AVSpeechUtterance(string: line); u.voice = Nova.voice; u.rate = 0.5; self.synth.speak(u) }
-            }
+        Task { @MainActor in
+            let w = self.prefs.weather ? await WeatherService.shared.briefLine() : nil
+            let c = await CalendarService.shared.briefLine()
+            let line = [w, c].compactMap { $0 }.joined(separator: " ")
+            self.reply = base + " " + line
+            if self.prefs.voiceReply { let u = AVSpeechUtterance(string: line); u.voice = Nova.voice; u.rate = 0.5; self.synth.speak(u) }
         }
         return base
     }
@@ -955,114 +930,6 @@ struct Bars: View {
                     Capsule().fill(color).frame(width: 3, height: active ? 3 + (height - 3) * a : 3)
                 }
             }.frame(height: height)
-        }
-    }
-}
-
-/// Nova's avatar in 3D: a star of light that turns in space, with a bright core,
-/// two orbit rings and glowing points. Drawn live, so it is never a flat picture.
-/// Nova's avatar. This is the same star the Nova site draws: two crossed pyramids of light
-/// turning in 3D, with a glowing core, an orbit ring and three moons. Same maths, same colours.
-struct Orb: View {
-    var size: CGFloat = 64
-    var fast = false
-    // "Nova orange" palette from the Nova site
-    static let a = Color(red: 1.0, green: 0.541, blue: 0.239)      // #FF8A3D
-    static let b = Color(red: 1.0, green: 0.761, blue: 0.561)      // #FFC28F
-    static let c = Color(red: 1.0, green: 0.851, blue: 0.722)      // #FFD9B8
-    static let dim = Color(red: 0.604, green: 0.416, blue: 0.290)  // #9A6A4A
-    static let core = Color(red: 1.0, green: 0.957, blue: 0.910)   // #FFF4E8
-    static let V: [[Double]] = [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1], [-1, -1, -1], [-1, 1, 1], [1, -1, 1], [1, 1, -1]]
-    static let E: [(Int, Int)] = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3), (4, 5), (4, 6), (4, 7), (5, 6), (5, 7), (6, 7)]
-
-    var body: some View {
-        TimelineView(.animation) { tl in
-            let t = tl.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 100000)
-            let think: Double = fast ? 1 : 0
-            Canvas { ctx, sz in
-                let W = Double(sz.width)
-                let cx = W / 2
-                let center = CGPoint(x: cx, y: cx)
-                let sc = W * 0.22
-                let ay = t * 0.5 * (fast ? 4 : 1)
-                let ax = 0.5 + sin(t * 0.4) * 0.2
-                var P: [(x: Double, y: Double, z: Double)] = []
-                for v in Orb.V {
-                    let X = v[0] * cos(ay) - v[2] * sin(ay)
-                    var Z = v[0] * sin(ay) + v[2] * cos(ay)
-                    let Y = v[1] * cos(ax) - Z * sin(ax)
-                    Z = v[1] * sin(ax) + Z * cos(ax)
-                    let f = 3.2 / (3.2 + Z)
-                    P.append((cx + X * sc * f, cx + Y * sc * f, Z))
-                }
-                // glow
-                ctx.fill(Path(CGRect(origin: .zero, size: sz)),
-                         with: .radialGradient(Gradient(colors: [Orb.a.opacity(0.16 + think * 0.14), Orb.a.opacity(0)]), center: center, startRadius: 0, endRadius: W * 0.5))
-                // orbit ring and three moons
-                let rx = W * 0.46, ry = W * 0.16, rot = -0.35
-                var moons: [(p: CGPoint, front: Bool, r: Double)] = []
-                if W >= 34 {
-                    let tr = CGAffineTransform(translationX: cx, y: cx).rotated(by: rot)
-                    let ring = Path(ellipseIn: CGRect(x: -rx, y: -ry, width: rx * 2, height: ry * 2)).applying(tr)
-                    ctx.stroke(ring, with: .color(Orb.a.opacity(0.22)), lineWidth: max(0.7, W / 280))
-                    let radii = [2.6, 1.8, 2.2]
-                    for m in 0..<3 {
-                        let th = t * (0.55 + Double(m) * 0.18) * (1 + think * 1.5) + Double(m) * 2.1
-                        let ex = rx * cos(th), ey = ry * sin(th)
-                        let p = CGPoint(x: cx + ex * cos(rot) - ey * sin(rot), y: cx + ex * sin(rot) + ey * cos(rot))
-                        moons.append((p, sin(th) > 0, max(0.9, radii[m] * W / 280)))
-                    }
-                }
-                for mo in moons where !mo.front {
-                    var g2 = ctx
-                    g2.opacity = 0.35
-                    g2.fill(Path(ellipseIn: CGRect(x: mo.p.x - mo.r, y: mo.p.y - mo.r, width: mo.r * 2, height: mo.r * 2)), with: .color(Orb.c))
-                }
-                // edges, far ones first
-                let lwFront = min(3.0, max(1.3, W * 0.0064))
-                var edges: [(i: Int, j: Int, z: Double)] = []
-                for e in Orb.E { edges.append((e.0, e.1, (P[e.0].z + P[e.1].z) / 2)) }
-                edges.sort { $0.z > $1.z }
-                for (k, e) in edges.enumerated() {
-                    let p0 = CGPoint(x: P[e.i].x, y: P[e.i].y)
-                    let p1 = CGPoint(x: P[e.j].x, y: P[e.j].y)
-                    let front = e.z < 0
-                    var line = Path()
-                    line.move(to: p0)
-                    line.addLine(to: p1)
-                    var g2 = ctx
-                    g2.opacity = front ? 0.95 : 0.28
-                    let grad = Gradient(colors: [e.i < 4 ? Orb.a : Orb.b, e.j < 4 ? Orb.a : Orb.c])
-                    g2.stroke(line, with: .linearGradient(grad, startPoint: p0, endPoint: p1),
-                              style: StrokeStyle(lineWidth: front ? lwFront : lwFront * 0.56, lineCap: .round))
-                    if fast {
-                        let u = (t * 1.6 + Double(k) * 0.37).truncatingRemainder(dividingBy: 1)
-                        let q = CGPoint(x: p0.x + (p1.x - p0.x) * u, y: p0.y + (p1.y - p0.y) * u)
-                        let pr = max(0.8, 1.8 * W / 280)
-                        ctx.fill(Path(ellipseIn: CGRect(x: q.x - pr, y: q.y - pr, width: pr * 2, height: pr * 2)), with: .color(Orb.core))
-                    }
-                }
-                // points
-                let dot = min(4.0, max(1.5, W * 0.0107))
-                var gd = ctx
-                gd.addFilter(.shadow(color: Orb.a, radius: min(10, max(3, W * 0.036))))
-                for p in P {
-                    let r = dot * (p.z < 0 ? 1 : 0.6)
-                    gd.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)), with: .color(p.z < 0 ? Orb.c : Orb.dim))
-                }
-                // core
-                let cr = min(5.0, max(2.0, W * 0.0143)) * (1 + 0.25 * sin(t * 3) + think * 0.6)
-                var g3 = ctx
-                g3.addFilter(.shadow(color: Orb.a, radius: min(24, max(6, W * 0.086))))
-                g3.fill(Path(ellipseIn: CGRect(x: cx - cr, y: cx - cr, width: cr * 2, height: cr * 2)), with: .color(Orb.core))
-                // moons in front
-                var gm = ctx
-                gm.addFilter(.shadow(color: Orb.a, radius: max(2, 8 * W / 280)))
-                for mo in moons where mo.front {
-                    gm.fill(Path(ellipseIn: CGRect(x: mo.p.x - mo.r, y: mo.p.y - mo.r, width: mo.r * 2, height: mo.r * 2)), with: .color(Orb.c))
-                }
-            }
-            .frame(width: size, height: size)
         }
     }
 }
@@ -1533,6 +1400,7 @@ struct VSlider: View {
 @MainActor
 struct ControlsView: View {
     @ObservedObject var g = Nova.shared
+    @ObservedObject var p = Prefs.shared
     var body: some View {
         VStack(spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
@@ -1562,6 +1430,7 @@ struct ControlsView: View {
                 small("camera.fill", "Mirror") { Sys.openApp("Photo Booth") }
                 small("camera.viewfinder", "Screenshot") { AppDelegate.shared?.close(); later(0.35) { DispatchQueue.global().async { Sys.screenshot() } } }
                 small("lock.fill", "Lock") { Sys.lock() }
+                small(p.shoulderGuard ? "eye.slash.fill" : "eye", p.shoulderGuard ? "Guard on" : "Guard off") { _ = g.setScreenGuard(!p.shoulderGuard) }
                 if g.timerEnd != nil { small("xmark", "Stop timer") { g.timerEnd = nil } }
                 Spacer()
             }
@@ -1950,7 +1819,7 @@ final class NotchPanel: NSPanel {
 var hotKeyAction: ((Int) -> Void)?
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     static var shared: AppDelegate?
     var panel: NotchPanel!
     var screen: NSScreen!
@@ -1962,6 +1831,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var settingsWindow: NSWindow?
     var timers: [Timer] = []
+    let glow = EdgeGlow()
+    var guardItem: NSMenuItem?
+    var stealthItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ n: Notification) {
         AppDelegate.shared = self
@@ -1993,6 +1865,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         })
         timers.append(Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in onMain { Nova.shared.pollClipboard() } })
         timers.append(Timer.scheduledTimer(withTimeInterval: 1800, repeats: true) { _ in onMain { Nova.shared.fetchWeather() } })
+        timers.append(Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { _ in onMain { AppDelegate.shared?.updateGlow() } })
         registerHotKey()
         makeStatusItem()
         makeMainMenu()
@@ -2030,6 +1903,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         m.addItem(withTitle: "Settings…", action: #selector(menuSettings), keyEquivalent: ",").target = self
         m.addItem(withTitle: "Report a bug…", action: #selector(menuBug), keyEquivalent: "").target = self
         m.addItem(.separator())
+        let gi = m.addItem(withTitle: "Screen guard", action: #selector(menuGuard), keyEquivalent: "")
+        gi.target = self; guardItem = gi
+        let si = m.addItem(withTitle: "Hide Notch from screen sharing", action: #selector(menuStealth), keyEquivalent: "")
+        si.target = self; stealthItem = si
+        m.delegate = self
+        m.addItem(.separator())
         m.addItem(withTitle: "Quit Notch", action: #selector(menuQuit), keyEquivalent: "q").target = self
         item.menu = m
         statusItem = item
@@ -2038,6 +1917,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func menuSettings() { showSettings() }
     @objc func menuApp() { showMain(.dashboard) }
     @objc func menuBug() { showMain(.bug) }
+    @objc func menuGuard() { _ = Nova.shared.setScreenGuard(!Prefs.shared.shoulderGuard) }
+    @objc func menuStealth() { Prefs.shared.stealth.toggle() }
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        guardItem?.state = Prefs.shared.shoulderGuard ? .on : .off
+        stealthItem?.state = Prefs.shared.stealth ? .on : .off
+    }
+    /// Rainbow edge while Nova listens, thinks or speaks.
+    func updateGlow() {
+        let g = Nova.shared
+        glow.set(Prefs.shared.screenGlow && (g.listening || g.thinking || g.speaking), screen: screen, hiddenFromSharing: Prefs.shared.stealth)
+    }
+    /// "Hide Notch from screen sharing": screenshots and shared screens skip Notch's own windows.
+    /// The shoulder-guard blur is never hidden, so it still covers your screen in a share.
+    func applyStealth() {
+        let t: NSWindow.SharingType = Prefs.shared.stealth ? .none : .readOnly
+        panel?.sharingType = t
+        settingsWindow?.sharingType = t
+    }
     @objc func menuQuit() { Nova.shared.setAwake(false); NSApp.terminate(nil) }
 
     func showSettings() { showMain(.features) }
@@ -2058,6 +1955,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             w.contentView = NSHostingView(rootView: MainView())
             w.center()
             settingsWindow = w
+            applyStealth()
         }
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
