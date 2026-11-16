@@ -1008,16 +1008,19 @@ struct NotchRoot: View {
     }
     var showBanner: Bool { !g.expanded && g.banner != nil }
     var glass: Bool { g.listening }
+    /// The notch drops into the liquid glass island while Nova thinks or speaks.
+    var drop: Bool { g.prefs.liquidIsland && !g.expanded && !glass && g.banner == nil && (g.thinking || g.speaking) }
     var k: CGFloat { (g.expanded || glass) ? CGFloat(g.prefs.scale) : 1 }
     var size: CGSize {
         if glass { return CGSize(width: 540, height: notchH + 178) }
         if g.expanded { return CGSize(width: 660, height: g.openHeight) }
         if g.banner != nil { return CGSize(width: 440, height: notchH + 50) }
+        if drop { return CGSize(width: notchW + 120, height: notchH + 84) }
         return CGSize(width: liveWidth, height: notchH)
     }
     var radius: CGFloat { glass ? 86 : (g.expanded ? 32 : (g.banner != nil ? 24 : 12)) }
     var glow: AnyShapeStyle? {
-        if glass { return nil }
+        if glass || drop { return nil }
         if showBanner { return AnyShapeStyle(g.bannerColor) }
         if let f = g.flash { return AnyShapeStyle(f) }
         if g.thinking || g.listening || g.expanded { return AnyShapeStyle(rainbow) }
@@ -1046,12 +1049,17 @@ struct NotchRoot: View {
                             NotchShape(radius: 10).fill(Color.black).frame(width: (notchW + 18) / k, height: notchH / k)
                         }
                         .transition(.opacity)
+                } else if drop {
+                    LiquidIsland(fast: g.thinking, notchW: notchW, notchH: notchH)
+                        .transition(.opacity.combined(with: .scale(scale: 0.6, anchor: .top)))
                 } else {
                     blackBack
                 }
-                content
-                    .padding(.horizontal, 9)
-                    .clipShape(NotchShape(radius: radius))
+                if !drop {
+                    content
+                        .padding(.horizontal, 9)
+                        .clipShape(NotchShape(radius: radius))
+                }
             }
             .frame(width: size.width + 18, height: size.height)
             .shadow(color: .black.opacity(g.expanded ? 0.45 : 0), radius: 24, y: 10)
@@ -1077,6 +1085,7 @@ struct NotchRoot: View {
         .animation(.spring(response: 0.45, dampingFraction: 0.72), value: g.banner)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: g.hasKey)
         .animation(.spring(response: 0.5, dampingFraction: 0.68), value: g.listening)
+        .animation(.spring(response: 0.5, dampingFraction: 0.62), value: drop)
         .preferredColorScheme(.dark)
     }
 

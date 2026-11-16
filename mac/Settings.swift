@@ -31,6 +31,7 @@ final class Prefs: ObservableObject {
     @Published var autoLock = Prefs.b("autoLock", false) { didSet { save("autoLock", autoLock) } }
     @Published var stealth = Prefs.b("stealth", false) { didSet { save("stealth", stealth) } }
     @Published var screenGlow = Prefs.b("screenGlow", true) { didSet { save("screenGlow", screenGlow) } }
+    @Published var liquidIsland = Prefs.b("liquidIsland", true) { didSet { save("liquidIsland", liquidIsland) } }
     @Published var weather = Prefs.b("weather", true) { didSet { save("weather", weather) } }
     @Published var clipboard = Prefs.b("clipboard", true) { didSet { save("clipboard", clipboard) } }
     @Published var openAtLogin = Prefs.b("openAtLogin", false) { didSet { save("openAtLogin", openAtLogin) } }
@@ -208,6 +209,7 @@ struct SettingsView: View {
                     Text("Medium").tag(0.8)
                     Text("Large").tag(1.0)
                 }.pickerStyle(.segmented)
+                row("Liquid glass island", "While Nova thinks or speaks, the notch drops into a glass island like the new iPhone.", $p.liquidIsland)
                 row("Open when the mouse touches the notch", "Off: use the hotkey ⌥⌘G or the menu bar icon.", $p.hoverOpen)
                 row("Show music in the notch", "Album art and controls for Spotify and Music.", $p.liveMusic)
                 row("Catch dropped files", "Drag a file onto the notch to summarise or email it.", $p.fileDrop)

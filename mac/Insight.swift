@@ -213,10 +213,76 @@ final class CalendarService {
     }
 }
 
-// MARK: - Nova's face: a liquid glass drop, like the new iPhone Dynamic Island.
-// Dark glass on top, light caught in the bottom, a prism streak that slides, a bright lip.
-// `fast` = Nova is thinking or speaking: the light moves quicker and the drop wobbles like liquid.
+// MARK: - Nova's face: the liquid glass island from the new iPhone (iOS 26).
+// Shape: a squircle about 1.4 times wider than tall, soft square-round corners.
+// Look: dark glass on top, light caught in the bottom, a prism streak that slides, a bright lip.
+// `fast` = Nova is thinking or speaking: the light moves quicker and the glass wobbles like liquid.
 
+/// A superellipse. n = 2 is an ellipse; higher n is squarer. 3.6 matches the iPhone island.
+struct Squircle: Shape {
+    var n: Double = 3.6
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        let a = Double(r.width) / 2, b = Double(r.height) / 2, cx = Double(r.midX), cy = Double(r.midY)
+        let steps = 120
+        for i in 0...steps {
+            let t = Double(i) / Double(steps) * 2 * Double.pi
+            let c = cos(t), s = sin(t)
+            let x = cx + a * (c < 0 ? -1 : 1) * pow(abs(c), 2 / n)
+            let y = cy + b * (s < 0 ? -1 : 1) * pow(abs(s), 2 / n)
+            if i == 0 { p.move(to: CGPoint(x: x, y: y)) } else { p.addLine(to: CGPoint(x: x, y: y)) }
+        }
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// The glass itself, any size. Used for Nova's avatar and for the island that drops from the notch.
+struct GlassDrop: View {
+    var width: CGFloat
+    var height: CGFloat
+    var fast = false
+    var body: some View {
+        TimelineView(.animation) { tl in
+            let t = tl.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 10000)
+            let k: Double = fast ? 1 : 0
+            let w = width, h = height
+            let sweep = sin(t * (fast ? 2.6 : 0.7))
+            let line = max(0.6, min(w, h * 1.4) * 0.022)
+            ZStack {
+                // dark glass body, black at the top like the island
+                Squircle().fill(LinearGradient(colors: [Color.black, Color.black, Color(white: 0.07), Color(white: 0.24).opacity(0.92)],
+                                               startPoint: .top, endPoint: .bottom))
+                // light caught inside the lower part
+                Squircle().fill(RadialGradient(colors: [Color.white.opacity(0.52 + 0.25 * k), Color.white.opacity(0)],
+                                               center: UnitPoint(x: 0.5 + sweep * 0.12, y: 1.0), startRadius: 0, endRadius: w * 0.5))
+                    .blendMode(.plusLighter)
+                // the prism streak, curved like the light in the glass
+                Squircle().trim(from: 0.13, to: 0.37)
+                    .stroke(LinearGradient(colors: Orb.prism, startPoint: .trailing, endPoint: .leading),
+                            style: StrokeStyle(lineWidth: max(1.2, h * 0.06), lineCap: .round))
+                    .scaleEffect(x: 0.80, y: 0.55)
+                    .offset(x: sweep * w * 0.08, y: -h * 0.06)
+                    .blur(radius: max(0.5, w * 0.012))
+                    .opacity(0.9)
+                    .blendMode(.plusLighter)
+                // bright lip along the bottom edge
+                Squircle().trim(from: 0.06, to: 0.44)
+                    .stroke(Color.white.opacity(0.85), style: StrokeStyle(lineWidth: line, lineCap: .round))
+                    .blur(radius: max(0.3, w * 0.006))
+                // thin glass rim, bright at the bottom
+                Squircle().stroke(LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.10), Color.white.opacity(0.5)],
+                                                 startPoint: .top, endPoint: .bottom), lineWidth: max(0.5, w * 0.008))
+            }
+            .frame(width: w, height: h)
+            .compositingGroup()
+            .scaleEffect(x: 1 + sin(t * (fast ? 7 : 2)) * (0.008 + 0.02 * k), y: 1 - sin(t * (fast ? 7 : 2)) * (0.008 + 0.02 * k), anchor: .top)
+            .shadow(color: Color.white.opacity(0.14 + 0.22 * k), radius: min(w, 140) * 0.12, y: h * 0.10)
+        }
+    }
+}
+
+/// Nova's avatar: the island glass at avatar size.
 struct Orb: View {
     var size: CGFloat = 64
     var fast = false
@@ -224,50 +290,27 @@ struct Orb: View {
         Color(red: 1.0, green: 0.36, blue: 0.40), Color(red: 1.0, green: 0.72, blue: 0.30), Color(red: 1.0, green: 0.95, blue: 0.50),
         Color(red: 0.40, green: 0.95, blue: 0.62), Color(red: 0.36, green: 0.76, blue: 1.0), Color(red: 0.66, green: 0.48, blue: 1.0),
     ]
-
     var body: some View {
-        TimelineView(.animation) { tl in
-            let t = tl.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 10000)
-            let k: Double = fast ? 1 : 0
-            let w = size, h = size * 0.80
-            let wobble = sin(t * (fast ? 7 : 2)) * (0.012 + 0.03 * k)
-            let sweep = sin(t * (fast ? 2.6 : 0.7))
-            let line = max(0.6, w * 0.022)
-            ZStack {
-                // dark glass body
-                Ellipse().fill(LinearGradient(colors: [Color.black, Color(white: 0.05), Color(white: 0.20).opacity(0.9)],
-                                              startPoint: .top, endPoint: .bottom))
-                // light caught inside the lower half
-                Ellipse().fill(RadialGradient(colors: [Color.white.opacity(0.50 + 0.25 * k), Color.white.opacity(0)],
-                                              center: UnitPoint(x: 0.5 + sweep * 0.12, y: 1.0), startRadius: 0, endRadius: w * 0.55))
-                    .blendMode(.plusLighter)
-                // the prism streak
-                Capsule().fill(LinearGradient(colors: Orb.prism, startPoint: .leading, endPoint: .trailing))
-                    .frame(width: w * 0.60, height: max(1.2, h * 0.07))
-                    .offset(x: sweep * w * 0.10, y: h * 0.24)
-                    .blur(radius: max(0.5, w * 0.014))
-                    .opacity(0.9)
-                    .blendMode(.plusLighter)
-                // bright lip along the bottom edge
-                Ellipse().trim(from: 0.07, to: 0.43)
-                    .stroke(Color.white.opacity(0.85), style: StrokeStyle(lineWidth: line, lineCap: .round))
-                    .blur(radius: max(0.3, w * 0.008))
-                // thin glass rim
-                Ellipse().stroke(LinearGradient(colors: [Color.white.opacity(0.30), Color.white.opacity(0.04), Color.white.opacity(0.45)],
-                                                startPoint: .top, endPoint: .bottom), lineWidth: max(0.5, w * 0.012))
-                // soft shine at the top left
-                Ellipse().fill(Color.white.opacity(0.16))
-                    .frame(width: w * 0.34, height: h * 0.12)
-                    .offset(x: -w * 0.16, y: -h * 0.27)
-                    .blur(radius: w * 0.03)
-            }
-            .frame(width: w, height: h)
-            .compositingGroup()
-            .scaleEffect(x: 1 + wobble, y: 1 - wobble)
-            .shadow(color: Color.white.opacity(0.16 + 0.22 * k), radius: w * 0.12, y: h * 0.10)
+        GlassDrop(width: size, height: size * 0.72, fast: fast)
             .frame(width: size, height: size)
+            .accessibilityLabel("Nova")
+    }
+}
+
+/// The notch turning into the glass island while Nova thinks or speaks: it hangs from the notch.
+struct LiquidIsland: View {
+    var fast: Bool
+    let notchW: CGFloat
+    let notchH: CGFloat
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .top) {
+                GlassDrop(width: geo.size.width, height: geo.size.height, fast: fast)
+                Rectangle().fill(Color.black).frame(width: notchW, height: notchH)   // the real notch on top
+            }
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
         }
-        .accessibilityLabel("Nova")
+        .allowsHitTesting(false)
     }
 }
 
