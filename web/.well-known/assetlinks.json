@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.zeroorigine.notch",
+      "sha256_cert_fingerprints": [
+        "8B:59:7D:85:27:DC:14:33:11:6F:84:A4:15:B2:13:08:06:2E:D7:27:7C:63:4D:8A:87:4D:36:9F:52:2D:AE:61"
+      ]
+    }
+  }
+]
