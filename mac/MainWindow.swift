@@ -82,7 +82,7 @@ struct MainView: View {
             HStack(spacing: 10) {
                 Orb(size: 40)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("Notch").font(.system(size: 20, weight: .bold))
+                    Text("NoTcH OS").font(.system(size: 20, weight: .bold))
                     HStack(spacing: 4) { Text("with").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.5)); NovaWord(size: 12) }
                 }
             }

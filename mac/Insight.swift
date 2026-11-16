@@ -139,7 +139,7 @@ final class WeatherService {
 final class CalendarService {
     static let shared = CalendarService()
     let store = EKEventStore()
-    static let noAccess = "Nova cannot see your calendar yet. Allow Notch in System Settings, Privacy and Security, Calendars."
+    static let noAccess = "Nova cannot see your calendar yet. Allow NoTcH OS in System Settings, Privacy and Security, Calendars."
 
     func access() async -> Bool {
         let st = EKEventStore.authorizationStatus(for: .event)

@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Builds Notch.app next to this script. Needs Xcode Command Line Tools (xcode-select --install).
+# Builds "NoTcH OS.app" next to this script. Needs Xcode Command Line Tools (xcode-select --install).
 # 1) runs unit tests, 2) builds for Apple chips and Intel, 3) joins them into one universal app.
 cd "$(dirname "$0")"
 SRC=(Notch.swift Features.swift Settings.swift MainWindow.swift Core.swift Tools.swift Brains.swift Insight.swift)
@@ -18,13 +18,15 @@ swiftc -O -parse-as-library -swift-version 5 -target x86_64-apple-macos13.0 $SRC
 lipo -create Notch_arm64 Notch_x86 -output Notch_bin && rm -f Notch_arm64 Notch_x86
 
 pkill -x Notch 2>/dev/null
-mkdir -p Notch.app/Contents/MacOS Notch.app/Contents/Resources
-cp -f AppIcon.icns Notch.app/Contents/Resources/AppIcon.icns 2>/dev/null
-mv -f Notch_bin Notch.app/Contents/MacOS/Notch
-cp -f Info.plist Notch.app/Contents/Info.plist
-codesign --force --sign - Notch.app >/dev/null 2>&1
-touch Notch.app
-lipo -archs Notch.app/Contents/MacOS/Notch > build_archs.txt
-echo "✓ Built Notch.app ($(cat build_archs.txt))"
-open Notch.app
-echo "✓ Notch is running. Hover the notch or press ⌥⌘G."
+APP="NoTcH OS.app"
+rm -rf Notch.app   # old name
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+cp -f AppIcon.icns "$APP/Contents/Resources/AppIcon.icns" 2>/dev/null
+mv -f Notch_bin "$APP/Contents/MacOS/Notch"
+cp -f Info.plist "$APP/Contents/Info.plist"
+codesign --force --sign - "$APP" >/dev/null 2>&1
+touch "$APP"
+lipo -archs "$APP/Contents/MacOS/Notch" > build_archs.txt
+echo "✓ Built $APP ($(cat build_archs.txt))"
+open "$APP"
+echo "✓ NoTcH OS is running. Hover the notch or press ⌥⌘G."

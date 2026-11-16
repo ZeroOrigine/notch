@@ -173,7 +173,7 @@ document.querySelectorAll('.chip').forEach(c => c.onclick = async () => {
   if (a === 'install') {
     if (installEvt) { installEvt.prompt(); installEvt = null; }
     else if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent) && 'ontouchend' in document) tip('Tap the Share button ( ⬆︎ ) then “Add to Home Screen”.');
-    else tip('In Chrome: click the install icon in the address bar, or menu ⋮ → “Install Notch”.');
+    else tip('In Chrome: click the install icon in the address bar, or menu ⋮ → “Install NoTcH OS”.');
   }
 });
 $('voicechip').textContent = S.voice ? '🔊 Voice on' : '🔇 Voice off';

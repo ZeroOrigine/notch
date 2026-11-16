@@ -230,7 +230,7 @@
     setMode('thinking'); $('reply').textContent = 'Thinking…';
     let r;
     try { r = await chrome.runtime.sendMessage({ type: 'ask', text }); }
-    catch { r = { reply: '⚠︎ Notch was updated. Refresh this page.' }; }
+    catch { r = { reply: '⚠︎ NoTcH OS was updated. Refresh this page.' }; }
     if (state.mode !== 'thinking') return;            // stopped
     show(r.reply); if (r.steps?.length) $('steps').textContent = '✓ ' + r.steps.join(' · ');
     if (!state.open) banner(r.reply);
@@ -245,7 +245,7 @@
     speechSynthesis.cancel();
     listening = true; state.chatting = true; $('chattag').style.display = 'inline';
     setMode('listening'); $('mic').classList.add('on'); $('q').placeholder = 'Listening in the Nova window…';
-    chrome.runtime.sendMessage({ type: 'voice' }).catch(() => { listening = false; setMode('idle'); show('⚠︎ Notch was updated. Refresh this page.'); });
+    chrome.runtime.sendMessage({ type: 'voice' }).catch(() => { listening = false; setMode('idle'); show('⚠︎ NoTcH OS was updated. Refresh this page.'); });
   }
   function heard(text) {
     listening = false; $('mic').classList.remove('on'); $('q').placeholder = 'Ask Nova…';

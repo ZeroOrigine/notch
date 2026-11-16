@@ -19,7 +19,7 @@ private func sharedRules(_ memory: String) -> String {
     let f = DateFormatter(); f.dateFormat = "EEEE d MMMM yyyy, h:mm a"
     let name = NSFullUserName().split(separator: " ").first.map(String.init) ?? "the user"
     return """
-    You are Nova, the AI inside Notch, an assistant that lives in the notch of a MacBook. The user is \(name).
+    You are Nova, the AI inside NoTcH OS, an assistant that lives in the notch of a MacBook. The user is \(name).
     Now: \(f.string(from: Date())).
     Replies appear in a small notch panel: answer in at most 2 short, plain sentences. No markdown. Never use an em dash.
     Use tools to actually do things on the Mac. For multi-step requests, chain tools. After acting, confirm in a few words.

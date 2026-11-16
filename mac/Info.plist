@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
- <key>CFBundleName</key><string>Notch</string>
- <key>CFBundleDisplayName</key><string>Notch</string>
+ <key>CFBundleName</key><string>NoTcH OS</string>
+ <key>CFBundleDisplayName</key><string>NoTcH OS</string>
  <key>CFBundleIdentifier</key><string>com.notch.app</string>
  <key>CFBundleExecutable</key><string>Notch</string>
  <key>CFBundlePackageType</key><string>APPL</string>
@@ -11,11 +11,11 @@
  <key>LSMinimumSystemVersion</key><string>13.0</string>
  <key>CFBundleIconFile</key><string>AppIcon</string>
  <key>NSHighResolutionCapable</key><true/>
- <key>NSMicrophoneUsageDescription</key><string>Notch listens when you tap the mic or say Hey Nova.</string>
- <key>NSSpeechRecognitionUsageDescription</key><string>Notch turns your voice into commands.</string>
- <key>NSCameraUsageDescription</key><string>Notch uses the camera on this Mac only, to see if you are there and to guard your screen.</string>
- <key>NSBluetoothAlwaysUsageDescription</key><string>Notch turns Bluetooth on and off for you.</string>
+ <key>NSMicrophoneUsageDescription</key><string>NoTcH OS listens when you tap the mic or say Hey Nova.</string>
+ <key>NSSpeechRecognitionUsageDescription</key><string>NoTcH OS turns your voice into commands.</string>
+ <key>NSCameraUsageDescription</key><string>NoTcH OS uses the camera on this Mac only, to see if you are there and to guard your screen.</string>
+ <key>NSBluetoothAlwaysUsageDescription</key><string>NoTcH OS turns Bluetooth on and off for you.</string>
  <key>NSCalendarsUsageDescription</key><string>Nova reads your events (never changes them) for your briefing and when you ask about your day.</string>
  <key>NSCalendarsFullAccessUsageDescription</key><string>Nova reads your events (never changes them) for your briefing and when you ask about your day.</string>
- <key>NSAppleEventsUsageDescription</key><string>Notch controls Music, Spotify, Mail and system settings for you.</string>
+ <key>NSAppleEventsUsageDescription</key><string>NoTcH OS controls Music, Spotify, Mail and system settings for you.</string>
 </dict></plist>

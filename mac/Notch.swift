@@ -789,8 +789,8 @@ final class Nova: ObservableObject {
 
     /// Mouse and keyboard: switched on in Settings, Accessibility allowed, and Touch ID once per task.
     func hands(_ what: String, _ body: () -> Void) async -> String {
-        guard prefs.useApps else { return "Using apps is switched off in Notch settings." }
-        guard Hands.trusted else { Hands.ask(); return "Accessibility permission is needed. The user must allow Notch in System Settings > Privacy & Security > Accessibility, then ask again." }
+        guard prefs.useApps else { return "Using apps is switched off in NoTcH OS settings." }
+        guard Hands.trusted else { Hands.ask(); return "Accessibility permission is needed. The user must allow NoTcH OS in System Settings > Privacy & Security > Accessibility, then ask again." }
         if !handsApproved {
             guard await approve("use your mouse and keyboard for this task") else { return "The user did not approve. Stop and do not use the mouse or keyboard." }
             handsApproved = true
@@ -805,7 +805,7 @@ final class Nova: ObservableObject {
     }
 
     func screenshotForBrain() async -> Any {
-        guard prefs.screenVision else { return "Screen viewing is switched off in Notch settings." }
+        guard prefs.screenVision else { return "Screen viewing is switched off in NoTcH OS settings." }
         let raw = NSTemporaryDirectory() + "notch_screen.png"
         try? FileManager.default.removeItem(atPath: raw)
         run("/usr/sbin/screencapture", ["-x", raw])
@@ -1877,11 +1877,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let appItem = NSMenuItem()
         main.addItem(appItem)
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "Open Notch", action: #selector(menuApp), keyEquivalent: "0").target = self
+        appMenu.addItem(withTitle: "Open NoTcH OS", action: #selector(menuApp), keyEquivalent: "0").target = self
         appMenu.addItem(withTitle: "Settings…", action: #selector(menuSettings), keyEquivalent: ",").target = self
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Hide Notch", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        appMenu.addItem(withTitle: "Quit Notch", action: #selector(menuQuit), keyEquivalent: "q").target = self
+        appMenu.addItem(withTitle: "Hide NoTcH OS", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: "Quit NoTcH OS", action: #selector(menuQuit), keyEquivalent: "q").target = self
         appItem.submenu = appMenu
         let editItem = NSMenuItem()
         main.addItem(editItem)
@@ -1896,20 +1896,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     func makeStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "Notch")
+        item.button?.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "NoTcH OS")
         let m = NSMenu()
-        m.addItem(withTitle: "Open Notch app", action: #selector(menuApp), keyEquivalent: "").target = self
+        m.addItem(withTitle: "Open NoTcH OS", action: #selector(menuApp), keyEquivalent: "").target = self
         m.addItem(withTitle: "Talk to Nova  (⌥⌘G)", action: #selector(menuOpen), keyEquivalent: "").target = self
         m.addItem(withTitle: "Settings…", action: #selector(menuSettings), keyEquivalent: ",").target = self
         m.addItem(withTitle: "Report a bug…", action: #selector(menuBug), keyEquivalent: "").target = self
         m.addItem(.separator())
         let gi = m.addItem(withTitle: "Screen guard", action: #selector(menuGuard), keyEquivalent: "")
         gi.target = self; guardItem = gi
-        let si = m.addItem(withTitle: "Hide Notch from screen sharing", action: #selector(menuStealth), keyEquivalent: "")
+        let si = m.addItem(withTitle: "Hide NoTcH OS from screen sharing", action: #selector(menuStealth), keyEquivalent: "")
         si.target = self; stealthItem = si
         m.delegate = self
         m.addItem(.separator())
-        m.addItem(withTitle: "Quit Notch", action: #selector(menuQuit), keyEquivalent: "q").target = self
+        m.addItem(withTitle: "Quit NoTcH OS", action: #selector(menuQuit), keyEquivalent: "q").target = self
         item.menu = m
         statusItem = item
     }
@@ -1946,7 +1946,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                              styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
             w.collectionBehavior = [.fullScreenPrimary]
             w.minSize = NSSize(width: 940, height: 640)
-            w.title = "Notch"
+            w.title = "NoTcH OS"
             w.titlebarAppearsTransparent = true
             w.titleVisibility = .hidden
             w.isMovableByWindowBackground = true

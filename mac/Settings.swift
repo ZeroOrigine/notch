@@ -125,7 +125,7 @@ enum BugReport {
         return """
         NOTCH BUG REPORT
         When: \(Log.stamp.string(from: Date()))
-        Notch version: \(app)
+        NoTcH OS version: \(app)
         macOS: \(v.majorVersion).\(v.minorVersion).\(v.patchVersion)
         Features: \(Prefs.shared.summary)
 
@@ -200,10 +200,10 @@ struct SettingsView: View {
         Form {
             Section("Screen privacy") {
                 row("Screen guard", "Blurs your whole screen when a second face looks over your shoulder. Uses this Mac's camera, nothing leaves the Mac. Also in the menu bar, the Controls tab, or say “screen guard on”.", $p.shoulderGuard)
-                row("Hide Notch from screen sharing", "Screenshots and shared screens (Zoom, Teams, Meet) skip Notch and your chats with Nova. A few newer capture apps may still see it.", $p.stealth)
+                row("Hide NoTcH OS from screen sharing", "Screenshots and shared screens (Zoom, Teams, Meet) skip NoTcH OS and your chats with Nova. A few newer capture apps may still see it.", $p.stealth)
             }
-            Section("Notch") {
-                Picker("Notch size", selection: $p.scale) {
+            Section("The island") {
+                Picker("Island size", selection: $p.scale) {
                     Text("Small").tag(0.7)
                     Text("Medium").tag(0.8)
                     Text("Large").tag(1.0)
@@ -226,7 +226,7 @@ struct SettingsView: View {
                 row("Chat mode", "After Nova talks, it listens again. Say “stop” or “thanks” to end.", $p.chatMode)
             }
             Section("Nova powers") {
-                row("Open Notch when the Mac starts", "", $p.openAtLogin)
+                row("Open NoTcH OS when the Mac starts", "", $p.openAtLogin)
                 row("Let Nova use apps for you", "Clicks and types inside apps. Needs a Claude key, Accessibility and Screen Recording. Asks Touch ID before send, delete, buy or pay.", $p.useApps)
                 row("Starfield and shooting stars", "", $p.stars)
                 row("Glowing screen edge", "A rainbow light around the screen while Nova listens or talks, like the new Siri.", $p.screenGlow)
@@ -316,7 +316,7 @@ struct SettingsView: View {
     var report: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("What went wrong?").font(.system(size: 15, weight: .semibold))
-            Text("Write what you did and what you expected. Notch adds your settings and its last 80 actions. No passwords or keys are included.")
+            Text("Write what you did and what you expected. NoTcH OS adds your settings and its last 80 actions. No passwords or keys are included.")
                 .font(.system(size: 12)).foregroundStyle(.secondary)
             TextEditor(text: $ui.bug)
                 .font(.system(size: 13))
