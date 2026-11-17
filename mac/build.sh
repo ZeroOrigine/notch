@@ -24,9 +24,16 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp -f AppIcon.icns "$APP/Contents/Resources/AppIcon.icns" 2>/dev/null
 mv -f Notch_bin "$APP/Contents/MacOS/Notch"
 cp -f Info.plist "$APP/Contents/Info.plist"
-codesign --force --sign - "$APP" >/dev/null 2>&1
+# Sign: Developer ID when this Mac has it (so it can be notarized), otherwise ad-hoc for local use.
+DEVID=$(security find-identity -v -p codesigning 2>/dev/null | grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"')
+if [ -n "$DEVID" ]; then
+  codesign --force --options runtime --timestamp --entitlements Notch.entitlements --sign "$DEVID" "$APP" || { echo "✗ Signing failed"; exit 1; }
+  echo "✓ Signed by $DEVID"
+else
+  codesign --force --sign - "$APP" >/dev/null 2>&1
+fi
 touch "$APP"
 lipo -archs "$APP/Contents/MacOS/Notch" > build_archs.txt
 echo "✓ Built $APP ($(cat build_archs.txt))"
-open "$APP"
+[ -n "$NOOPEN" ] || open "$APP"
 echo "✓ NoTcH OS is running. Hover the notch or press ⌥⌘G."
