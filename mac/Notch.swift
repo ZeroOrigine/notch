@@ -1756,7 +1756,7 @@ struct AskView: View {
     @ViewBuilder var mainArea: some View {
         if g.listening {
             HStack(spacing: 18) {
-                Orb(size: 70)
+                Orb(size: 88, fast: true)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("LISTENING").font(.system(size: 12, weight: .bold)).foregroundStyle(.white.opacity(0.5))
                     Text(g.input.isEmpty ? "Go ahead…" : g.input).font(.system(size: 20, weight: .semibold)).lineLimit(2)
@@ -1765,7 +1765,7 @@ struct AskView: View {
             }
         } else if g.thinking {
             HStack(alignment: .top, spacing: 16) {
-                Orb(size: 50, fast: true)
+                Orb(size: 64, fast: true)
                 VStack(alignment: .leading, spacing: 5) {
                     if g.steps.isEmpty {
                         Text("Thinking…").font(.system(size: 17, weight: .semibold)).foregroundStyle(rainbow)
@@ -1784,7 +1784,7 @@ struct AskView: View {
             }
         } else {
             HStack(alignment: .top, spacing: 14) {
-            Orb(size: 50)
+            Orb(size: 60, fast: g.speaking)
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
                     NovaWord(size: 17)

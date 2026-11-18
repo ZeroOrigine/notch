@@ -282,9 +282,10 @@ struct GlassDrop: View {
     }
 }
 
-/// Nova's avatar: the new Siri. A clear glass sphere with ribbons of light waving inside,
-/// (The rainbow ribbon was removed on 2026-11-18 at the founder's request.)
-/// `fast` = Nova is thinking or speaking: the light moves quicker and the waves grow.
+/// Nova's avatar: a dark glass sphere with one twisting ribbon of light across the middle.
+/// Warm red and amber ride on top, a thin white-hot core runs through, blue and cyan sit underneath.
+/// No rainbow ribbon below it (founder, 2026-11-18).
+/// `fast` = Nova is listening, thinking or speaking: the light moves quicker and swells.
 struct Orb: View {
     var size: CGFloat = 64
     var fast = false
@@ -292,21 +293,14 @@ struct Orb: View {
         Color(red: 1.0, green: 0.36, blue: 0.40), Color(red: 1.0, green: 0.72, blue: 0.30), Color(red: 1.0, green: 0.95, blue: 0.50),
         Color(red: 0.40, green: 0.95, blue: 0.62), Color(red: 0.36, green: 0.76, blue: 1.0), Color(red: 0.66, green: 0.48, blue: 1.0),
     ]
-    // inside the sphere: colour, height of the wave, speed, thickness, vertical place, phase
-    // inside the sphere, like the new Siri: one flowing band across the middle,
-    // warm orange and red on top, a white-hot core, blue underneath.
-    // colour, height of the wave, speed, thickness, vertical place, phase
-    static let inner: [(Color, Double, Double, Double, Double, Double)] = [
-        (Color(red: 1.0, green: 0.59, blue: 0.16), 0.13, 1.2, 0.07, -0.14, 0.35),  // orange
-        (Color(red: 1.0, green: 0.20, blue: 0.16), 0.13, 1.2, 0.07, -0.08, 0.25),  // red
-        (Color(red: 0.20, green: 0.40, blue: 1.0), 0.13, 1.2, 0.09, 0.08, 0.05),   // blue
-        (Color(red: 0.35, green: 0.75, blue: 1.0), 0.13, 1.2, 0.05, 0.03, 0.12),   // light blue
-        (Color.white, 0.13, 1.2, 0.018, -0.025, 0.18),                             // white-hot core
-    ]
-    // the ground ribbon, top to bottom
-    static let ground: [Color] = [
-        Color(red: 0.25, green: 0.50, blue: 1.0), Color(red: 0.35, green: 0.95, blue: 0.75), Color(red: 1.0, green: 0.95, blue: 0.55),
-        Color.white, Color(red: 1.0, green: 0.65, blue: 0.30), Color(red: 1.0, green: 0.30, blue: 0.25),
+    // colour, where it starts and ends across the ball (-1 left edge, 1 right edge),
+    // how far above (-) or below (+) the core, half thickness, blur, strength
+    static let ribbon: [(Color, Double, Double, Double, Double, Double, Double)] = [
+        (Color(red: 1.0, green: 0.27, blue: 0.16), -0.45, 0.98, -0.13, 0.13, 0.07, 0.85),   // red, humps on the right
+        (Color(red: 1.0, green: 0.67, blue: 0.24), -0.75, 0.80, -0.06, 0.07, 0.05, 0.85),   // amber under the red
+        (Color(red: 0.16, green: 0.35, blue: 1.0), -0.98, 0.45, 0.13, 0.14, 0.07, 0.90),    // deep blue, belly on the left
+        (Color(red: 0.43, green: 0.82, blue: 1.0), -0.85, 0.60, 0.06, 0.07, 0.05, 0.85),    // cyan above the blue
+        (Color.white, -0.97, 0.97, 0.0, 0.024, 0.022, 0.95),                                // white-hot core
     ]
 
     /// A band between two curves that tapers to a point at both ends.
@@ -326,6 +320,9 @@ struct Orb: View {
         p.closeSubpath()
         return p
     }
+    static func arc(_ c: CGPoint, _ r: Double, _ a0: Double, _ a1: Double) -> Path {
+        var p = Path(); p.addArc(center: c, radius: r, startAngle: .degrees(a0), endAngle: .degrees(a1), clockwise: false); return p
+    }
 
     var body: some View {
         TimelineView(.animation) { tl in
@@ -333,54 +330,51 @@ struct Orb: View {
             let k: Double = fast ? 1 : 0
             Canvas { ctx, sz in
                 let W = Double(sz.width)
-                let withGround = false   // founder 2026-11-18: no rainbow ribbon
-                let r = W * (withGround ? 0.34 : 0.46)
-                let cx = W / 2, cy = withGround ? W * 0.40 : W / 2
+                let r = W * 0.46
+                let cx = W / 2, cy = W / 2
                 let c = CGPoint(x: cx, y: cy)
                 let ball = Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
-                let speed = 1 + k * 2.2
+                let phase = t * (0.9 + 1.8 * k)
+                let swell = 1 + 0.5 * k + 0.15 * k * sin(t * 5)
+                func core(_ x: Double) -> Double { cy + sin((x - cx) / r * 1.7 + phase + 0.5) * 0.10 * r * swell }
 
-                // ground ribbon, behind the sphere
-                if withGround {
-                    var gg = ctx
-                    gg.addFilter(.blur(radius: W * 0.022))
-                    gg.blendMode = .plusLighter
-                    let base = W * 0.80, x0 = W * 0.02, x1 = W * 0.98
-                    for (i, col) in Orb.ground.enumerated() {
-                        let off = (Double(i) - 2.5) * W * 0.022
-                        let path = Orb.band(x0, x1, { x in
-                            base + off + sin(x / W * 5.2 - t * 0.9 * speed + Double(i) * 0.25) * W * 0.05 - (x - W / 2) * 0.06
-                        }, W * 0.022)
-                        gg.fill(path, with: .color(col.opacity(0.75)))
-                    }
-                }
                 // dark glass body
-                ctx.fill(ball, with: .radialGradient(Gradient(colors: [Color(white: 0.09), Color.black.opacity(0.92)]),
+                ctx.fill(ball, with: .radialGradient(Gradient(colors: [Color(white: 0.07), Color(white: 0.03)]),
                                                      center: c, startRadius: 0, endRadius: r))
-                // light ribbons inside
-                var inn = ctx
-                inn.clip(to: ball)
-                inn.blendMode = .plusLighter
-                inn.addFilter(.blur(radius: r * 0.07))
-                for (col, amp, sp, th, y, ph) in Orb.inner {
-                    let a = amp * (1 + 0.6 * k)
-                    let path = Orb.band(cx - r, cx + r, { x in
-                        cy + y * r + sin((x - cx) / r * 2.4 + t * sp * speed + ph) * a * r
-                    }, th * r * (1 + 0.3 * k * sin(t * 6 + ph)))
-                    inn.fill(path, with: .color(col.opacity(col == Color.white ? 0.75 : 0.65)))
+                // faint haze in the top half, so it reads as glass and not a black disc
+                var haze = ctx
+                haze.clip(to: ball)
+                haze.addFilter(.blur(radius: r * 0.18))
+                haze.fill(Path(ellipseIn: CGRect(x: cx - r * 0.8, y: cy - r * 0.95, width: r * 1.6, height: r * 0.85)),
+                          with: .color(Color.white.opacity(0.10)))
+                // the ribbon of light
+                for (col, a, b, yo, th, bl, al) in Orb.ribbon {
+                    var inn = ctx
+                    inn.clip(to: ball)
+                    inn.blendMode = .plusLighter
+                    inn.addFilter(.blur(radius: max(0.3, r * bl)))
+                    let path = Orb.band(cx + a * r, cx + b * r, { x in core(x) + yo * r }, th * r * (1 + 0.3 * k))
+                    inn.fill(path, with: .color(col.opacity(al)))
                 }
-                // glass rim: faint at the top, bright at the bottom
-                ctx.stroke(ball, with: .linearGradient(Gradient(colors: [Color.white.opacity(0.55), Color.white.opacity(0.22), Color.white.opacity(0.85)]),
-                                                       startPoint: CGPoint(x: cx, y: cy - r), endPoint: CGPoint(x: cx, y: cy + r)),
-                           lineWidth: max(0.6, r * 0.035))
-                // colour bending at the edges: red on the left, blue on the right
+                // glass edge: a soft glow just inside the rim, brighter at the bottom, plus a thin crisp line
+                let rimShade = GraphicsContext.Shading.linearGradient(
+                    Gradient(colors: [Color.white.opacity(0.38), Color.white.opacity(0.38), Color.white.opacity(0.78)]),
+                    startPoint: CGPoint(x: cx, y: cy - r), endPoint: CGPoint(x: cx, y: cy + r))
+                var soft = ctx
+                soft.clip(to: ball)
+                soft.blendMode = .plusLighter
+                soft.addFilter(.blur(radius: max(0.5, r * 0.05)))
+                soft.stroke(ball, with: rimShade, lineWidth: max(1, r * 0.06))
+                ctx.stroke(ball, with: rimShade, lineWidth: max(0.5, r * 0.012))
+                // colour where the ribbon meets the glass: amber and blue on the left, white on the right
                 var edge = ctx
+                edge.clip(to: ball)
                 edge.blendMode = .plusLighter
-                edge.addFilter(.blur(radius: max(0.4, r * 0.035)))
-                var left = Path(); left.addArc(center: c, radius: r * 0.97, startAngle: .degrees(100), endAngle: .degrees(200), clockwise: false)
-                var right = Path(); right.addArc(center: c, radius: r * 0.97, startAngle: .degrees(-20), endAngle: .degrees(80), clockwise: false)
-                edge.stroke(left, with: .color(Color(red: 1, green: 0.3, blue: 0.3).opacity(0.75)), lineWidth: max(0.8, r * 0.06))
-                edge.stroke(right, with: .color(Color(red: 0.35, green: 0.55, blue: 1).opacity(0.75)), lineWidth: max(0.8, r * 0.06))
+                edge.addFilter(.blur(radius: max(0.4, r * 0.05)))
+                let w = max(0.8, r * 0.07)
+                edge.stroke(Orb.arc(c, r * 0.97, 182, 205), with: .color(Color(red: 1, green: 0.6, blue: 0.2).opacity(0.9)), lineWidth: w)
+                edge.stroke(Orb.arc(c, r * 0.97, 150, 178), with: .color(Color(red: 0.2, green: 0.45, blue: 1).opacity(0.9)), lineWidth: w)
+                edge.stroke(Orb.arc(c, r * 0.97, -8, 14), with: .color(Color.white.opacity(0.7)), lineWidth: w)
             }
             .frame(width: size, height: size)
             .scaleEffect(1 + (fast ? 0.03 * sin(t * 5) : 0.012 * sin(t * 1.6)))
