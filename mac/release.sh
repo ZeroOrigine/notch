@@ -14,4 +14,11 @@ xcrun stapler staple "$APP"
 rm -f NoTcH-OS-mac.zip
 ditto -c -k --keepParent "$APP" NoTcH-OS-mac.zip
 spctl -a -vv "$APP"
-echo "✓ Release ready: $(pwd)/NoTcH-OS-mac.zip"
+VER=$(defaults read "$(pwd)/$APP/Contents/Info" CFBundleShortVersionString)
+BLD=$(defaults read "$(pwd)/$APP/Contents/Info" CFBundleVersion)
+SHA=$(shasum -a 256 NoTcH-OS-mac.zip | cut -d" " -f1)
+NOTES=${NOTES:-"New in $VER."}
+cat > mac-update.json <<JSON
+{"version":"$VER","build":$BLD,"url":"https://notch.zeroorigine.com/downloads/NoTcH-OS-mac.zip","sha256":"$SHA","notes":"$NOTES"}
+JSON
+echo "✓ Release ready: $(pwd)/NoTcH-OS-mac.zip and mac-update.json (version $VER, build $BLD)"

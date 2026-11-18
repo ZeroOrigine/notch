@@ -38,6 +38,7 @@ final class Prefs: ObservableObject {
     @Published var chatMode = Prefs.b("chatMode", true) { didSet { save("chatMode", chatMode) } }
     @Published var useApps = Prefs.b("useApps", true) { didSet { save("useApps", useApps) } }
     @Published var stars = Prefs.b("stars", true) { didSet { save("stars", stars) } }
+    @Published var updateAlerts = Prefs.b("updateAlerts", true) { didSet { save("updateAlerts", updateAlerts) } }
     @Published var scale = (UserDefaults.standard.object(forKey: "scale") as? Double) ?? 0.8 { didSet { save("scale", scale) } }
     @Published var fixStyle = UserDefaults.standard.string(forKey: "fixStyle") ?? "fix spelling and grammar and make it clear" { didSet { save("fixStyle", fixStyle) } }
     @Published var translateFrom = UserDefaults.standard.string(forKey: "translateFrom") ?? "es-ES" { didSet { save("translateFrom", translateFrom) } }
@@ -160,6 +161,7 @@ final class UIState: ObservableObject {
 struct SettingsView: View {
     @ObservedObject var p = Prefs.shared
     @ObservedObject var ui = UIState.shared
+    @ObservedObject var up = Updater.shared
 
     let languages = [("Spanish", "es-ES"), ("Hindi", "hi-IN"), ("French", "fr-FR"), ("German", "de-DE"),
                      ("Punjabi", "pa-IN"), ("Marathi", "mr-IN"), ("Chinese", "zh-CN"), ("Arabic", "ar-SA")]
@@ -199,6 +201,23 @@ struct SettingsView: View {
 
     var features: some View {
         Form {
+            Section("Software update") {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("NoTcH OS \(up.version)").font(.system(size: 14, weight: .semibold))
+                        Text(up.status.isEmpty ? "Updates install here. No new download needed." : up.status)
+                            .font(.system(size: 12)).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if let v = up.available {
+                        Button("Install \(v.version)") { Task { await up.install() } }.disabled(up.busy).buttonStyle(.borderedProminent)
+                    } else {
+                        Button("Check now") { Task { await up.check(quiet: false) } }.disabled(up.busy)
+                    }
+                }
+                if let n = up.available?.notes, !n.isEmpty { Text(n).font(.system(size: 12)).foregroundStyle(.secondary) }
+                row("Tell me when an update is ready", "NoTcH OS checks once a day and lets you know.", $p.updateAlerts)
+            }
             Section("Screen privacy") {
                 row("Screen guard", "Blurs your whole screen when a second face looks over your shoulder. Uses this Mac's camera, nothing leaves the Mac. Also in the menu bar, the Controls tab, or say “screen guard on”.", $p.shoulderGuard)
                 row("Hide NoTcH OS from screen sharing", "Screenshots and shared screens (Zoom, Teams, Meet) skip NoTcH OS and your chats with Nova. A few newer capture apps may still see it.", $p.stealth)

@@ -283,7 +283,7 @@ struct GlassDrop: View {
 }
 
 /// Nova's avatar: the new Siri. A clear glass sphere with ribbons of light waving inside,
-/// resting on a flowing rainbow (the rainbow shows from 44 points up, where there is room for it).
+/// (The rainbow ribbon was removed on 2026-11-18 at the founder's request.)
 /// `fast` = Nova is thinking or speaking: the light moves quicker and the waves grow.
 struct Orb: View {
     var size: CGFloat = 64
@@ -293,11 +293,15 @@ struct Orb: View {
         Color(red: 0.40, green: 0.95, blue: 0.62), Color(red: 0.36, green: 0.76, blue: 1.0), Color(red: 0.66, green: 0.48, blue: 1.0),
     ]
     // inside the sphere: colour, height of the wave, speed, thickness, vertical place, phase
+    // inside the sphere, like the new Siri: one flowing band across the middle,
+    // warm orange and red on top, a white-hot core, blue underneath.
+    // colour, height of the wave, speed, thickness, vertical place, phase
     static let inner: [(Color, Double, Double, Double, Double, Double)] = [
-        (Color(red: 1.0, green: 0.25, blue: 0.30), 0.16, 1.1, 0.13, 0.22, 0.0),   // red
-        (Color(red: 0.25, green: 0.45, blue: 1.0), 0.18, 1.4, 0.14, 0.20, 2.1),   // blue
-        (Color(red: 0.85, green: 0.35, blue: 1.0), 0.14, 1.7, 0.12, 0.14, 4.0),   // violet
-        (Color.white, 0.12, 1.25, 0.09, 0.06, 1.0),                               // white core
+        (Color(red: 1.0, green: 0.59, blue: 0.16), 0.13, 1.2, 0.07, -0.14, 0.35),  // orange
+        (Color(red: 1.0, green: 0.20, blue: 0.16), 0.13, 1.2, 0.07, -0.08, 0.25),  // red
+        (Color(red: 0.20, green: 0.40, blue: 1.0), 0.13, 1.2, 0.09, 0.08, 0.05),   // blue
+        (Color(red: 0.35, green: 0.75, blue: 1.0), 0.13, 1.2, 0.05, 0.03, 0.12),   // light blue
+        (Color.white, 0.13, 1.2, 0.018, -0.025, 0.18),                             // white-hot core
     ]
     // the ground ribbon, top to bottom
     static let ground: [Color] = [
@@ -329,7 +333,7 @@ struct Orb: View {
             let k: Double = fast ? 1 : 0
             Canvas { ctx, sz in
                 let W = Double(sz.width)
-                let withGround = W >= 44
+                let withGround = false   // founder 2026-11-18: no rainbow ribbon
                 let r = W * (withGround ? 0.34 : 0.46)
                 let cx = W / 2, cy = withGround ? W * 0.40 : W / 2
                 let c = CGPoint(x: cx, y: cy)
@@ -363,10 +367,10 @@ struct Orb: View {
                     let path = Orb.band(cx - r, cx + r, { x in
                         cy + y * r + sin((x - cx) / r * 2.4 + t * sp * speed + ph) * a * r
                     }, th * r * (1 + 0.3 * k * sin(t * 6 + ph)))
-                    inn.fill(path, with: .color(col.opacity(col == Color.white ? 0.9 : 0.8)))
+                    inn.fill(path, with: .color(col.opacity(col == Color.white ? 0.75 : 0.65)))
                 }
                 // glass rim: faint at the top, bright at the bottom
-                ctx.stroke(ball, with: .linearGradient(Gradient(colors: [Color.white.opacity(0.18), Color.white.opacity(0.12), Color.white.opacity(0.85)]),
+                ctx.stroke(ball, with: .linearGradient(Gradient(colors: [Color.white.opacity(0.55), Color.white.opacity(0.22), Color.white.opacity(0.85)]),
                                                        startPoint: CGPoint(x: cx, y: cy - r), endPoint: CGPoint(x: cx, y: cy + r)),
                            lineWidth: max(0.6, r * 0.035))
                 // colour bending at the edges: red on the left, blue on the right

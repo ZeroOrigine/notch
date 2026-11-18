@@ -1842,6 +1842,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var timers: [Timer] = []
     let glow = EdgeGlow()
     var guardItem: NSMenuItem?
+    var updateItem: NSMenuItem?
     var stealthItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ n: Notification) {
@@ -1879,6 +1880,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         makeStatusItem()
         makeMainMenu()
         showMain(.dashboard)
+        Updater.shared.start()
     }
 
     func makeMainMenu() {
@@ -1888,6 +1890,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "Open NoTcH OS", action: #selector(menuApp), keyEquivalent: "0").target = self
         appMenu.addItem(withTitle: "Settings…", action: #selector(menuSettings), keyEquivalent: ",").target = self
+        appMenu.addItem(withTitle: "Check for Updates…", action: #selector(menuUpdate), keyEquivalent: "").target = self
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Hide NoTcH OS", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(withTitle: "Quit NoTcH OS", action: #selector(menuQuit), keyEquivalent: "q").target = self
@@ -1911,6 +1914,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         m.addItem(withTitle: "Talk to Nova  (⌥⌘G)", action: #selector(menuOpen), keyEquivalent: "").target = self
         m.addItem(withTitle: "Settings…", action: #selector(menuSettings), keyEquivalent: ",").target = self
         m.addItem(withTitle: "Report a bug…", action: #selector(menuBug), keyEquivalent: "").target = self
+        let ui = m.addItem(withTitle: "Check for Updates…", action: #selector(menuUpdate), keyEquivalent: "")
+        ui.target = self; updateItem = ui
         m.addItem(.separator())
         let gi = m.addItem(withTitle: "Screen guard", action: #selector(menuGuard), keyEquivalent: "")
         gi.target = self; guardItem = gi
@@ -1928,9 +1933,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func menuBug() { showMain(.bug) }
     @objc func menuGuard() { _ = Nova.shared.setScreenGuard(!Prefs.shared.shoulderGuard) }
     @objc func menuStealth() { Prefs.shared.stealth.toggle() }
+    @objc func menuUpdate() {
+        let u = Updater.shared
+        Task { @MainActor in
+            if u.available != nil { await u.install() }
+            else { await u.check(quiet: false); if u.available == nil { Nova.shared.notify(u.status) } }
+        }
+    }
     func menuNeedsUpdate(_ menu: NSMenu) {
         guardItem?.state = Prefs.shared.shoulderGuard ? .on : .off
         stealthItem?.state = Prefs.shared.stealth ? .on : .off
+        if let v = Updater.shared.available { updateItem?.title = "Install NoTcH OS \(v.version)…" } else { updateItem?.title = "Check for Updates…" }
     }
     /// Rainbow edge while Nova listens, thinks or speaks.
     func updateGlow() {
