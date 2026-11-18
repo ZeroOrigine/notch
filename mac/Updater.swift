@@ -63,6 +63,8 @@ final class Updater: ObservableObject {
     }
 
     func install() async {
+        // Read the feed again first: what we saw earlier may be a version that has since been replaced.
+        if !busy { await check(quiet: true) }
         guard let info = available, !busy, let url = URL(string: info.url),
               url.scheme == "https", url.host == Updater.feed.host else { return }
         busy = true
