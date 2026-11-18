@@ -61,9 +61,29 @@
   <h1>NoTcH OS</h1>
   <p class="sub">Nova, your AI, lives in a Dynamic Island. Talk to it. It opens apps, sets timers and answers in a second.</p>
   <div class="cta">
-    <a class="btn primary" href="/app/">Open NoTcH OS now</a>
-    <a class="btn ghost" href="#get">Get it for your device</a>
+    <a class="btn primary" id="mainDl" href="/downloads/NoTcH-OS-mac.zip" download>Download for Mac</a>
+    <a class="btn ghost" id="altDl" href="/app/">Use it in your browser</a>
   </div>
+  <p class="sub" id="dlNote" style="font-size:14px;opacity:.75">Free. Signed and checked by Apple. macOS 13 or newer.</p>
+  <script>
+  (function(){
+    var ua=navigator.userAgent, m=document.getElementById('mainDl'), a=document.getElementById('altDl'), n=document.getElementById('dlNote');
+    var touchMac=/Macintosh/.test(ua)&&navigator.maxTouchPoints>1;
+    if(/iPhone|iPad|iPod/.test(ua)||touchMac){
+      m.textContent='Open NoTcH OS on this iPhone'; m.href='/app/'; m.removeAttribute('download');
+      a.textContent='Get the Mac app'; a.href='#get';
+      n.textContent='iPhone: open it, tap Share, then "Add to Home Screen". The App Store app is coming soon.';
+    } else if(/Android/.test(ua)){
+      m.textContent='Open NoTcH OS on this phone'; m.href='/app/'; m.removeAttribute('download');
+      a.textContent='Get the Mac app'; a.href='#get';
+      n.textContent='Android: open it, tap the menu, then "Install app". Google Play is coming soon.';
+    } else if(/Windows|Linux|CrOS/.test(ua)){
+      m.textContent='Open NoTcH OS now'; m.href='/app/'; m.removeAttribute('download');
+      a.textContent='Get the Chrome extension'; a.href='#get';
+      n.textContent='Works in Chrome or Edge. The Mac app is for MacBooks and iMacs.';
+    }
+  })();
+  </script>
 </section>
 
 <section>
@@ -72,7 +92,7 @@
     <div class="card"><div class="i">🎙</div><h3>Just talk</h3><p>Tap the mic and speak. Nova answers out loud, then keeps listening. Say “thanks” to stop.</p></div>
     <div class="card"><div class="i">⚡️</div><h3>It does things</h3><p>“Open YouTube.” “Set a 5 minute timer.” “Search for pizza near me.” Done.</p></div>
     <div class="card"><div class="i">🧠</div><h3>It remembers</h3><p>Your chat is saved on your device. Say “remember that…” and Nova keeps it.</p></div>
-    <div class="card"><div class="i">✨</div><h3>Alive</h3><p>A spinning 3D Nova star, twinkling stars, shooting stars, and an island that glows when Nova talks.</p></div>
+    <div class="card"><div class="i">✨</div><h3>Alive</h3><p>A glass Nova sphere with living light inside, and an island that glows when Nova talks.</p></div>
   </div>
 </section>
 
@@ -80,7 +100,7 @@
   <h2>Get NoTcH OS</h2>
   <div class="grid">
     <div class="card"><div class="i">📱</div><h3>iPhone &amp; iPad</h3>
-      <p>Works now in Safari.</p>
+      <p>Works now in Safari. App Store app coming soon.</p>
       <ol class="steps"><li>Open notch.zeroorigine.com/app</li><li>Tap Share ⬆︎</li><li>Tap “Add to Home Screen”</li></ol>
       <a class="btn primary" href="/app/">Open on this device</a></div>
     <div class="card"><div class="i">🌐</div><h3>Chrome</h3>
@@ -90,7 +110,7 @@
     <div class="card"><div class="i">💻</div><h3>Mac</h3>
       <p>The real notch: system controls, voice, and Nova uses apps for you. Touch ID guards anything that sends, deletes or pays.</p>
       <ol class="steps"><li>Download and double-click the zip</li><li>Drag NoTcH OS into Applications</li><li>Open it. Signed and checked by Apple, so no warning</li></ol>
-      <a class="btn ghost" href="/downloads/NoTcH-OS-mac.zip" download>Download for Mac</a></div>
+      <a class="btn primary" href="/downloads/NoTcH-OS-mac.zip" download>Download for Mac (version 5.1)</a></div>
     <div class="card"><div class="i">🖥</div><h3>Windows, Android, any computer</h3>
       <p>Open the web app in Chrome or Edge, then click the install icon in the address bar.</p>
       <a class="btn ghost" href="/app/">Open web app</a></div>
