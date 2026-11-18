@@ -1162,7 +1162,10 @@ struct NotchRoot: View {
             Spacer().frame(width: notchW / k)
             Spacer()
             Button { g.toggleMic() } label: {
-                Label("Talk", systemImage: "mic.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.white.opacity(0.9))
+                HStack(spacing: 6) {
+                    Orb(size: 20, fast: g.listening || g.speaking)
+                    Text(g.listening ? "Listening" : "Talk")
+                }.font(.system(size: 13, weight: .bold)).foregroundStyle(Color.white.opacity(0.9))
             }.buttonStyle(Pop())
         }
         .padding(.horizontal, 26)
@@ -1722,8 +1725,11 @@ struct AskView: View {
                     }.buttonStyle(Pop()).help("Stop Nova (⌥⌘.)")
                 }
                 Button { g.toggleMic() } label: {
-                    Image(systemName: g.listening ? "stop.fill" : "mic.fill").font(.system(size: 14, weight: .bold))
-                        .frame(width: 32, height: 32).background(Circle().fill(g.listening ? Color.red : Color.white.opacity(0.12)))
+                    Group {
+                        if g.listening { Image(systemName: "stop.fill").font(.system(size: 14, weight: .bold)) }
+                        else { Orb(size: 30, fast: false) }
+                    }
+                    .frame(width: 32, height: 32).background(Circle().fill(g.listening ? Color.red : Color.clear))
                 }.buttonStyle(Pop())
                 Button { g.send() } label: {
                     Image(systemName: "arrow.up").font(.system(size: 14, weight: .heavy))
