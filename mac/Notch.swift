@@ -1012,7 +1012,7 @@ struct NotchRoot: View {
     var drop: Bool { g.prefs.liquidIsland && !g.expanded && !glass && g.banner == nil && (g.thinking || g.speaking) }
     var k: CGFloat { (g.expanded || glass) ? CGFloat(g.prefs.scale) : 1 }
     var size: CGSize {
-        if glass { return CGSize(width: 540, height: notchH + 178) }
+        if glass { return CGSize(width: 540, height: notchH + 204) }
         if g.expanded { return CGSize(width: 660, height: g.openHeight) }
         if g.banner != nil { return CGSize(width: 440, height: notchH + 50) }
         if drop { return CGSize(width: notchW + 120, height: notchH + 84) }
@@ -1670,20 +1670,7 @@ struct GlassListen: View {
     var body: some View {
         VStack(spacing: 6) {
             Spacer().frame(height: notchH + 6)
-            TimelineView(.animation) { tl in
-                let t = tl.date.timeIntervalSinceReferenceDate
-                ZStack {
-                    ForEach(0..<5, id: \.self) { i in
-                        let x = sin(t * 1.7 + Double(i) * 1.35) * 150
-                        let y = cos(t * 2.4 + Double(i) * 0.9) * 10
-                        let sy = 0.7 + 0.5 * abs(sin(t * 6 + Double(i) * 2))
-                        Ellipse().fill(colors[i]).frame(width: 190, height: 50)
-                            .scaleEffect(x: 1, y: sy).offset(x: x, y: y).blendMode(.screen).opacity(0.85)
-                    }
-                }
-                .frame(height: 74)
-                .blur(radius: 18)
-            }
+            Orb(size: 96, fast: true)   // Nova's sphere is the talking AI (founder, 2026-11-18)
             Text(g.input.isEmpty ? "Listening…" : "“\(g.input)”")
                 .font(.system(size: 22, weight: .semibold)).lineLimit(2).multilineTextAlignment(.center)
                 .shadow(color: Color.black.opacity(0.5), radius: 6)

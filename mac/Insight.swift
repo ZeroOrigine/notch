@@ -392,6 +392,8 @@ struct LiquidIsland: View {
         GeometryReader { geo in
             ZStack(alignment: .top) {
                 GlassDrop(width: geo.size.width, height: geo.size.height, fast: fast)
+                Orb(size: min(64, geo.size.height - notchH - 14), fast: fast)   // the sphere talks inside the island
+                    .padding(.top, notchH + 6)
                 Rectangle().fill(Color.black).frame(width: notchW, height: notchH)   // the real notch on top
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
