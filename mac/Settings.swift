@@ -228,7 +228,7 @@ struct SettingsView: View {
                     Text("Medium").tag(0.8)
                     Text("Large").tag(1.0)
                 }.pickerStyle(.segmented)
-                row("Liquid glass island", "While Nova thinks or speaks, the notch drops into a glass island like the new iPhone.", $p.liquidIsland)
+                row("Nova's sphere under the notch", "While Nova thinks or speaks, her glass sphere appears under the notch and moves as she talks.", $p.liquidIsland)
                 row("Open when the mouse touches the notch", "Off: use the hotkey ⌥⌘G or the menu bar icon.", $p.hoverOpen)
                 row("Show music in the notch", "Album art and controls for Spotify and Music.", $p.liveMusic)
                 row("Catch dropped files", "Drag a file onto the notch to summarise or email it.", $p.fileDrop)

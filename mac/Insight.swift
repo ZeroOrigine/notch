@@ -385,15 +385,28 @@ struct Orb: View {
 
 /// The notch turning into the glass island while Nova thinks or speaks: it hangs from the notch.
 struct LiquidIsland: View {
+    /// What shows under the notch while Nova thinks or speaks. Founder, 2026-11-21: no glass island here,
+    /// only Nova's sphere, and it should move like it is talking.
     var fast: Bool
+    var speaking: Bool = false
     let notchW: CGFloat
     let notchH: CGFloat
     var body: some View {
         GeometryReader { geo in
+            let side = min(geo.size.height - notchH - 10, 92)
             ZStack(alignment: .top) {
-                GlassDrop(width: geo.size.width, height: geo.size.height, fast: fast)
-                Orb(size: min(64, geo.size.height - notchH - 14), fast: fast)   // the sphere talks inside the island
-                    .padding(.top, notchH + 6)
+                TimelineView(.animation) { tl in
+                    let t = tl.date.timeIntervalSinceReferenceDate
+                    // a speech-like rhythm: three overlapping beats, so it never looks like a steady pulse
+                    let voice = speaking ? (0.5 + 0.5 * sin(t * 9.0)) * (0.6 + 0.4 * sin(t * 3.1 + 1)) * (0.7 + 0.3 * sin(t * 14.0 + 2)) : 0
+                    ZStack {
+                        Circle().fill(Color.black.opacity(0.55)).blur(radius: 14).frame(width: side * 1.15, height: side * 1.15)
+                        Orb(size: side, fast: true)
+                            .scaleEffect(1 + 0.10 * voice)
+                    }
+                    .frame(width: side * 1.3, height: side * 1.3)
+                }
+                .padding(.top, notchH - 4)
                 Rectangle().fill(Color.black).frame(width: notchW, height: notchH)   // the real notch on top
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .top)

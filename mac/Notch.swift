@@ -1050,7 +1050,7 @@ struct NotchRoot: View {
                         }
                         .transition(.opacity)
                 } else if drop {
-                    LiquidIsland(fast: g.thinking, notchW: notchW, notchH: notchH)
+                    LiquidIsland(fast: g.thinking, speaking: g.speaking, notchW: notchW, notchH: notchH)
                         .transition(.opacity.combined(with: .scale(scale: 0.6, anchor: .top)))
                 } else {
                     blackBack
