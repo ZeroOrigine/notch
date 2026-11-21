@@ -1015,7 +1015,7 @@ struct NotchRoot: View {
         if glass { return CGSize(width: 540, height: notchH + 204) }
         if g.expanded { return CGSize(width: 660, height: g.openHeight) }
         if g.banner != nil { return CGSize(width: 440, height: notchH + 50) }
-        if drop { return CGSize(width: notchW + 120, height: notchH + 84) }
+        if drop { return CGSize(width: notchW + 120, height: notchH + 118) }
         return CGSize(width: liveWidth, height: notchH)
     }
     var radius: CGFloat { glass ? 86 : (g.expanded ? 32 : (g.banner != nil ? 24 : 12)) }
