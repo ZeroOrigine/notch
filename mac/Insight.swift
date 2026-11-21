@@ -389,11 +389,12 @@ struct LiquidIsland: View {
     /// only Nova's sphere, and it should move like it is talking.
     var fast: Bool
     var speaking: Bool = false
+    var caption: String? = nil      // what Nova is saying, shown under the sphere
     let notchW: CGFloat
     let notchH: CGFloat
     var body: some View {
         GeometryReader { geo in
-            let side = min(geo.size.height - notchH - 10, 92)
+            let side: CGFloat = 92
             ZStack(alignment: .top) {
                 TimelineView(.animation) { tl in
                     let t = tl.date.timeIntervalSinceReferenceDate
@@ -407,6 +408,16 @@ struct LiquidIsland: View {
                     .frame(width: side * 1.3, height: side * 1.3)
                 }
                 .padding(.top, notchH - 4)
+                if let caption, !caption.isEmpty {
+                    Text(caption)
+                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                        .lineLimit(2).multilineTextAlignment(.center)
+                        .padding(.horizontal, 14).padding(.vertical, 8)
+                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.black.opacity(0.82)))
+                        .frame(maxWidth: geo.size.width - 8)
+                        .padding(.top, notchH + side * 1.3 - 6)
+                        .transition(.opacity)
+                }
                 Rectangle().fill(Color.black).frame(width: notchW, height: notchH)   // the real notch on top
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .top)

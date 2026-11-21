@@ -1009,13 +1009,15 @@ struct NotchRoot: View {
     var showBanner: Bool { !g.expanded && g.banner != nil }
     var glass: Bool { g.listening }
     /// The notch drops into the liquid glass island while Nova thinks or speaks.
-    var drop: Bool { g.prefs.liquidIsland && !g.expanded && !glass && g.banner == nil && (g.thinking || g.speaking) }
+    /// Nova's sphere under the notch while she thinks or speaks. It wins over the text banner:
+    /// before 5.8 the banner (which carries every spoken reply) hid the sphere, so it almost never showed.
+    var drop: Bool { g.prefs.liquidIsland && !g.expanded && !glass && (g.thinking || g.speaking) }
     var k: CGFloat { (g.expanded || glass) ? CGFloat(g.prefs.scale) : 1 }
     var size: CGSize {
         if glass { return CGSize(width: 540, height: notchH + 204) }
         if g.expanded { return CGSize(width: 660, height: g.openHeight) }
+        if drop { return g.banner != nil ? CGSize(width: 460, height: notchH + 118 + 64) : CGSize(width: notchW + 120, height: notchH + 118) }
         if g.banner != nil { return CGSize(width: 440, height: notchH + 50) }
-        if drop { return CGSize(width: notchW + 120, height: notchH + 118) }
         return CGSize(width: liveWidth, height: notchH)
     }
     var radius: CGFloat { glass ? 86 : (g.expanded ? 32 : (g.banner != nil ? 24 : 12)) }
@@ -1050,7 +1052,7 @@ struct NotchRoot: View {
                         }
                         .transition(.opacity)
                 } else if drop {
-                    LiquidIsland(fast: g.thinking, speaking: g.speaking, notchW: notchW, notchH: notchH)
+                    LiquidIsland(fast: g.thinking, speaking: g.speaking, caption: g.banner, notchW: notchW, notchH: notchH)
                         .transition(.opacity.combined(with: .scale(scale: 0.6, anchor: .top)))
                 } else {
                     blackBack
