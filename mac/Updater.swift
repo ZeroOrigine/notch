@@ -98,23 +98,29 @@ final class Updater: ObservableObject {
             guard verify.code == 0, who.text.contains("TeamIdentifier=\(Updater.team)"), apple.code == 0
             else { throw Fail("The new version failed Apple's safety check. Nothing was changed.") }
 
-            // Swap the app after we quit, then reopen it. If the copy fails, the old app is put back.
-            let dest = Bundle.main.bundlePath
+            // Where to put the new version. If this copy is running from Downloads, macOS runs it from a hidden,
+            // read-only place (App Translocation) and it cannot be replaced: then install into Applications instead.
+            let here = Bundle.main.bundlePath
+            let stuck = here.contains("/AppTranslocation/") || !fm.isWritableFile(atPath: (here as NSString).deletingLastPathComponent)
+            let dest = stuck ? "/Applications/NoTcH OS.app" : here
             let script = work.appendingPathComponent("swap.sh")
             try """
             #!/bin/sh
             while kill -0 \(ProcessInfo.processInfo.processIdentifier) 2>/dev/null; do sleep 0.3; done
-            DEST="$1"; NEW="$2"
+            DEST="$1"; NEW="$2"; HERE="$3"
             rm -rf "$DEST.old"
-            if mv "$DEST" "$DEST.old" && /usr/bin/ditto "$NEW" "$DEST"; then rm -rf "$DEST.old"
-            else rm -rf "$DEST"; mv "$DEST.old" "$DEST"; fi
-            /usr/bin/open "$DEST"
+            if [ -e "$DEST" ]; then mv "$DEST" "$DEST.old" || { /usr/bin/open "$HERE"; exit 1; }; fi
+            if /usr/bin/ditto "$NEW" "$DEST"; then rm -rf "$DEST.old"
+            else rm -rf "$DEST"; [ -e "$DEST.old" ] && mv "$DEST.old" "$DEST"; fi
+            sleep 0.5
+            /usr/bin/open "$DEST" || /usr/bin/open "$HERE"
             """.write(to: script, atomically: true, encoding: .utf8)
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/bin/sh")
-            p.arguments = [script.path, dest, newApp.path]
+            p.arguments = [script.path, dest, newApp.path, here]
             try p.run()
-            status = "Installing \(info.version). NoTcH OS will reopen in a moment."
+            status = stuck ? "Installing \(info.version) into your Applications folder. NoTcH OS will reopen from there."
+                           : "Installing \(info.version). NoTcH OS will reopen in a moment."
             try? await Task.sleep(nanoseconds: 600_000_000)
             Nova.shared.setAwake(false)
             NSApp.terminate(nil)
