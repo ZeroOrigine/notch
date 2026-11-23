@@ -529,6 +529,19 @@ final class Nova: ObservableObject {
         awake = on
     }
     var missedTimer = false
+    /// The small picture in front of a notch message, chosen by what the message is about.
+    static func bannerIcon(_ text: String, _ c: Color) -> String {
+        let t = text.lowercased()
+        if t.contains("locked") || t.contains("quiet") { return "lock.fill" }
+        if t.contains("is back") { return "lock.open.fill" }
+        if t.contains("timer") { return "timer" }
+        if t.contains("battery") || t.contains("charging") || t.contains("unplugged") { return "battery.75" }
+        if t.contains("update") { return "arrow.down.circle.fill" }
+        if c == .red { return t.contains("someone") ? "person.2.fill" : "exclamationmark.circle.fill" }
+        if c == .orange { return "touchid" }
+        if t.contains("welcome") || t.contains("ready") || t.contains("morning") || t.contains("evening") || t.contains("afternoon") { return "sparkles" }
+        return "checkmark.circle.fill"
+    }
     /// Called every second by the app, whatever is on screen.
     func checkTimer() {
         guard let e = timerEnd, Date() >= e else { return }
@@ -1227,7 +1240,7 @@ struct NotchRoot: View {
             VStack(spacing: 0) {
                 Spacer().frame(height: notchH)
                 HStack(spacing: 10) {
-                    Image(systemName: g.bannerColor == .red ? "person.2.fill" : g.bannerColor == .orange ? "touchid" : "faceid")
+                    Image(systemName: Nova.bannerIcon(g.banner ?? "", g.bannerColor))
                         .font(.system(size: 20, weight: .semibold)).foregroundStyle(g.bannerColor)
                     Text(b).font(.system(size: 16, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.7)
                 }

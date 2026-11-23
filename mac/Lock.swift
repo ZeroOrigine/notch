@@ -41,7 +41,8 @@ enum CallDetector {
             var buf = [CChar](repeating: 0, count: 4096)
             guard proc_pidpath(pid, &buf, UInt32(buf.count)) > 0 else { continue }
             let path = String(cString: buf)
-            if path.hasPrefix("/System/") || path.hasPrefix("/usr/") || path.hasPrefix(myPath) { continue }
+            // macOS background listeners live in /System/Library and /usr; FaceTime and QuickTime live in /System/Applications and DO count.
+            if path.hasPrefix("/System/Library/") || path.hasPrefix("/usr/") || path.hasPrefix(myPath) { continue }
             if path.contains(".app/") { return true }
         }
         return false

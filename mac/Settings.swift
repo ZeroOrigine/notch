@@ -32,7 +32,9 @@ final class Prefs: ObservableObject {
     @Published var autoLock = Prefs.b("autoLock", false) { didSet { save("autoLock", autoLock) } }
     @Published var stealth = Prefs.b("stealth", false) { didSet { save("stealth", stealth) } }
     @Published var screenGlow = Prefs.b("screenGlow", true) { didSet { save("screenGlow", screenGlow) } }
-    @Published var liquidIsland = Prefs.b("liquidIsland", true) { didSet { save("liquidIsland", liquidIsland) } }
+    // 6.0: the sphere has its own switch, on for everyone (the old glass-island switch was off on some Macs)
+    @Published var liquidIsland = Prefs.b("novaSphere", true) { didSet { save("novaSphere", liquidIsland) } }
+    @Published var homeCity = UserDefaults.standard.string(forKey: "homeCity") ?? "" { didSet { save("homeCity", homeCity); onMain { WeatherService.shared.forgetHere(); Nova.shared.fetchWeather() } } }
     @Published var weather = Prefs.b("weather", true) { didSet { save("weather", weather) } }
     @Published var clipboard = Prefs.b("clipboard", true) { didSet { save("clipboard", clipboard) } }
     @Published var openAtLogin = Prefs.b("openAtLogin", false) { didSet { save("openAtLogin", openAtLogin) } }
@@ -246,6 +248,11 @@ struct SettingsView: View {
                     Text("Large").tag(1.0)
                 }.pickerStyle(.segmented)
                 row("Nova's sphere under the notch", "While Nova thinks or speaks, her glass sphere appears under the notch and moves as she talks.", $p.liquidIsland)
+                HStack {
+                    Text("My city for weather").font(.system(size: 13))
+                    Spacer()
+                    TextField("Found by itself", text: $p.homeCity).textFieldStyle(.roundedBorder).frame(width: 200)
+                }
                 row("Open when the mouse touches the notch", "Off: use the hotkey ⌥⌘G or the menu bar icon.", $p.hoverOpen)
                 row("Show music in the notch", "Album art and controls for Spotify and Music.", $p.liveMusic)
                 row("Catch dropped files", "Drag a file onto the notch to summarise or email it.", $p.fileDrop)

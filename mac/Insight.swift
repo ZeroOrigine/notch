@@ -30,16 +30,29 @@ final class WeatherService {
     }
 
     /// Empty name = where the Mac is (rough, from the internet address, cached for an hour).
+    func forgetHere() { here = nil; hereAt = nil }
     func place(_ raw: String) async -> Place? {
         let n = (raw.components(separatedBy: ",").first ?? raw).trimmingCharacters(in: .whitespacesAndNewlines)
         if n.isEmpty || ["here", "home", "my location", "current location"].contains(n.lowercased()) {
             if let h = here, let at = hereAt, Date().timeIntervalSince(at) < 3600 { return h }
-            guard let j = await getJSON("https://ipwho.is/"), (j["success"] as? Bool) != false,
-                  let lat = (j["latitude"] as? NSNumber)?.doubleValue,
-                  let lon = (j["longitude"] as? NSNumber)?.doubleValue else { return here }
-            let p = Place(lat: lat, lon: lon, name: j["city"] as? String ?? "your area")
-            here = p; hereAt = Date()
-            return p
+            // 1. The city typed in Settings always wins.
+            let saved = (UserDefaults.standard.string(forKey: "homeCity") ?? "").trimmingCharacters(in: .whitespaces)
+            if !saved.isEmpty, let p = await place(saved) { here = p; hereAt = Date(); return p }
+            // 2. The internet address, but only if it agrees with the Mac's own time zone.
+            //    A VPN (NordVPN and similar) can make Toronto look like Mumbai; the clock does not lie.
+            let tz = TimeZone.current.identifier
+            if let j = await getJSON("https://ipwho.is/"), (j["success"] as? Bool) != false,
+               let lat = (j["latitude"] as? NSNumber)?.doubleValue, let lon = (j["longitude"] as? NSNumber)?.doubleValue {
+                let ipTZ = (j["timezone"] as? [String: Any])?["id"] as? String ?? ""
+                if ipTZ.isEmpty || ipTZ == tz || TimeZone(identifier: ipTZ)?.secondsFromGMT() == TimeZone.current.secondsFromGMT() {
+                    let p = Place(lat: lat, lon: lon, name: j["city"] as? String ?? "your area")
+                    here = p; hereAt = Date(); return p
+                }
+            }
+            // 3. Otherwise the city in the Mac's time zone name (America/Toronto -> Toronto).
+            let city = (tz.components(separatedBy: "/").last ?? "").replacingOccurrences(of: "_", with: " ")
+            if !city.isEmpty, city != "GMT", city != "UTC", let p = await place(city) { here = p; hereAt = Date(); return p }
+            return here
         }
         let q = n.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? n
         guard let j = await getJSON("https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&format=json&name=\(q)"),
