@@ -368,14 +368,14 @@ struct Orb: View {
                     // ripple rings: three rings leave the glass in turn while Nova talks
                     for i in 0..<3 {
                         let p = (t / 1.5 + Double(i) / 3).truncatingRemainder(dividingBy: 1)
-                        let rr = W * 0.40 * (1.0 + 0.24 * p)
+                        let rr = W * 0.40 * (1.02 + 0.20 * p)
                         var ring = ctx
                         ring.blendMode = .plusLighter
                         ring.addFilter(.blur(radius: max(0.5, W * 0.012)))
-                        ring.opacity = talk * (1 - p) * (1 - p) * 0.75
+                        ring.opacity = talk * (1 - p) * (1 - p)
                         ring.stroke(Path(ellipseIn: CGRect(x: cx - rr, y: cy - rr, width: rr * 2, height: rr * 2)),
                                     with: .conicGradient(Gradient(colors: Orb.prism + [Orb.prism[0]]), center: c, angle: .radians(t * 1.4 + Double(i))),
-                                    lineWidth: max(1, W * 0.018 * (1 - 0.6 * p)))
+                                    lineWidth: max(1.2, W * 0.026 * (1 - 0.5 * p)))
                     }
                     // soft halo that breathes with the words
                     var halo = ctx
