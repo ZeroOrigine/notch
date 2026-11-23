@@ -295,7 +295,7 @@ struct GlassDrop: View {
     }
 }
 
-/// Nova's avatar (6.0): a see-through liquid-glass drop that wobbles like jelly.
+/// Nova's avatar (6.1): a see-through glass ball. It stays round; when she talks it pulses, swirls and sends out rings.
 /// Clear glass with a bright misty rim, a highlight on top, a caustic glow at the bottom,
 /// and one ribbon of light inside (warm on top, white core, blue below). No ribbon under it.
 /// `fast` = listening or thinking (the light moves quicker). `talk` 0...1 = speaking (the glass wobbles with the voice).
@@ -358,15 +358,40 @@ struct Orb: View {
             let voice = talk * (0.5 + 0.5 * sin(t * 9.0)) * (0.6 + 0.4 * sin(t * 3.1 + 1)) * (0.7 + 0.3 * sin(t * 14.0 + 2))
             Canvas { ctx, sz in
                 let W = Double(sz.width)
-                let r = W * 0.42
+                // 6.1 (founder, 2026-11-23): less wobble. The glass stays round; speaking is a move, not a jelly.
+                // The ball swells with each word, the light swirls, and rings of colour ripple out.
+                let pulse = 1 + 0.05 * voice
+                let r = W * 0.40 * pulse
                 let cx = W / 2, cy = W / 2
                 let c = CGPoint(x: cx, y: cy)
-                let amp = 0.016 + 0.020 * k + 0.050 * voice
-                let squash = 0.018 * sin(t * 2.2) * (0.5 + k) + 0.035 * voice * sin(t * 7)
-                let ball = Orb.blob(c, r, t * (1 + 0.8 * k + 1.5 * talk), amp, squash)
-                let phase = t * (0.9 + 1.8 * k + 1.2 * talk)
-                let swell = 1 + 0.5 * k + 0.6 * voice
+                if talk > 0.01 {
+                    // ripple rings: three rings leave the glass in turn while Nova talks
+                    for i in 0..<3 {
+                        let p = (t / 1.5 + Double(i) / 3).truncatingRemainder(dividingBy: 1)
+                        let rr = W * 0.40 * (1.0 + 0.24 * p)
+                        var ring = ctx
+                        ring.blendMode = .plusLighter
+                        ring.addFilter(.blur(radius: max(0.5, W * 0.012)))
+                        ring.opacity = talk * (1 - p) * (1 - p) * 0.75
+                        ring.stroke(Path(ellipseIn: CGRect(x: cx - rr, y: cy - rr, width: rr * 2, height: rr * 2)),
+                                    with: .conicGradient(Gradient(colors: Orb.prism + [Orb.prism[0]]), center: c, angle: .radians(t * 1.4 + Double(i))),
+                                    lineWidth: max(1, W * 0.018 * (1 - 0.6 * p)))
+                    }
+                    // soft halo that breathes with the words
+                    var halo = ctx
+                    halo.blendMode = .plusLighter
+                    halo.addFilter(.blur(radius: W * 0.06))
+                    halo.opacity = talk * (0.25 + 0.45 * voice)
+                    halo.stroke(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                                with: .conicGradient(Gradient(colors: Orb.prism + [Orb.prism[0]]), center: c, angle: .radians(-t * 0.9)),
+                                lineWidth: W * 0.05)
+                }
+                let ball = Orb.blob(c, r, t * 0.8, 0.004 + 0.004 * k, 0)
+                let phase = t * (0.9 + 1.2 * k)      // steady speed: changing it mid-way made the light jump
+                let swell = 1 + 0.3 * k + 0.9 * voice
                 func core(_ x: Double) -> Double { cy + sin((x - cx) / r * 1.7 + phase + 0.5) * 0.10 * r * swell }
+                // the light swirls round inside the glass while she talks
+                let spin = Angle.radians(0.35 * sin(t * 0.7) * k + 0.5 * talk * sin(t * 1.3))
 
                 // see-through glass body: darker in the middle so the light shows, clear at the edge
                 ctx.fill(ball, with: .radialGradient(Gradient(stops: [
@@ -378,10 +403,11 @@ struct Orb: View {
                 for (col, a, b, yo, th, bl, al) in Orb.ribbon {
                     var inn = ctx
                     inn.clip(to: ball)
+                    inn.translateBy(x: cx, y: cy); inn.rotate(by: spin); inn.translateBy(x: -cx, y: -cy)
                     inn.blendMode = .plusLighter
                     inn.addFilter(.blur(radius: max(0.3, r * bl)))
-                    inn.fill(Orb.band(cx + a * r, cx + b * r, { x in core(x) + yo * r }, th * r * (1 + 0.3 * k + 0.35 * voice)),
-                             with: .color(col.opacity(al)))
+                    inn.fill(Orb.band(cx + a * r, cx + b * r, { x in core(x) + yo * r }, th * r * (1 + 0.3 * k + 0.45 * voice)),
+                             with: .color(col.opacity(min(1, al * (1 + 0.25 * voice)))))
                 }
                 // misty rim inside the glass: soft all round, brightest at the bottom
                 let rim = GraphicsContext.Shading.linearGradient(
