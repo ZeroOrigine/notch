@@ -63,7 +63,6 @@ final class FaceWatch: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     var onCount: ((Int) -> Void)?
 
     func start() {
-        guard !running else { return }
         AVCaptureDevice.requestAccess(for: .video) { ok in
             guard ok else { return }
             self.q.async {
@@ -86,6 +85,7 @@ final class FaceWatch: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     }
     func stop() {
         q.async {
+            guard self.running else { return }
             self.session.stopRunning()
             self.session.inputs.forEach { self.session.removeInput($0) }
             self.session.outputs.forEach { self.session.removeOutput($0) }
@@ -151,7 +151,8 @@ enum FileReader {
 
     /// Returns (mediaType, base64) — HEIC is converted to JPEG first. Large images are shrunk.
     static func imageBase64(_ u: URL) -> (String, String)? {
-        let tmp = NSTemporaryDirectory() + "notch_img.jpg"
+        let tmp = NSTemporaryDirectory() + "notch_img_\(UUID().uuidString).jpg"
+        defer { try? FileManager.default.removeItem(atPath: tmp) }
         run("/usr/bin/sips", ["-s", "format", "jpeg", "-Z", "1600", u.path, "--out", tmp])
         guard let d = FileManager.default.contents(atPath: tmp) else { return nil }
         return ("image/jpeg", d.base64EncodedString())
@@ -182,8 +183,10 @@ enum LoginItem {
     static let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/LaunchAgents/com.notch.app.plist")
     static func set(_ on: Bool) {
         if on {
+            var path = Bundle.main.bundlePath
+            if path.contains("/AppTranslocation/") || !path.hasPrefix("/") { path = "/Applications/NoTcH OS.app" }
             let plist: [String: Any] = ["Label": "com.notch.app",
-                                        "ProgramArguments": ["/usr/bin/open", "-g", Bundle.main.bundlePath, "--args", "--login"],
+                                        "ProgramArguments": ["/usr/bin/open", "-g", path, "--args", "--login"],
                                         "RunAtLoad": true]
             try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             (plist as NSDictionary).write(to: url, atomically: true)

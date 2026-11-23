@@ -282,25 +282,25 @@ struct GlassDrop: View {
     }
 }
 
-/// Nova's avatar: a dark glass sphere with one twisting ribbon of light across the middle.
-/// Warm red and amber ride on top, a thin white-hot core runs through, blue and cyan sit underneath.
-/// No rainbow ribbon below it (founder, 2026-11-18).
-/// `fast` = Nova is listening, thinking or speaking: the light moves quicker and swells.
+/// Nova's avatar (6.0): a see-through liquid-glass drop that wobbles like jelly.
+/// Clear glass with a bright misty rim, a highlight on top, a caustic glow at the bottom,
+/// and one ribbon of light inside (warm on top, white core, blue below). No ribbon under it.
+/// `fast` = listening or thinking (the light moves quicker). `talk` 0...1 = speaking (the glass wobbles with the voice).
 struct Orb: View {
     var size: CGFloat = 64
     var fast = false
+    var talk: Double = 0
     static let prism: [Color] = [
         Color(red: 1.0, green: 0.36, blue: 0.40), Color(red: 1.0, green: 0.72, blue: 0.30), Color(red: 1.0, green: 0.95, blue: 0.50),
         Color(red: 0.40, green: 0.95, blue: 0.62), Color(red: 0.36, green: 0.76, blue: 1.0), Color(red: 0.66, green: 0.48, blue: 1.0),
     ]
-    // colour, where it starts and ends across the ball (-1 left edge, 1 right edge),
-    // how far above (-) or below (+) the core, half thickness, blur, strength
+    // colour, start and end across the ball (-1 left, 1 right), offset from the core, half thickness, blur, strength
     static let ribbon: [(Color, Double, Double, Double, Double, Double, Double)] = [
-        (Color(red: 1.0, green: 0.27, blue: 0.16), -0.45, 0.98, -0.13, 0.13, 0.07, 0.85),   // red, humps on the right
-        (Color(red: 1.0, green: 0.67, blue: 0.24), -0.75, 0.80, -0.06, 0.07, 0.05, 0.85),   // amber under the red
-        (Color(red: 0.16, green: 0.35, blue: 1.0), -0.98, 0.45, 0.13, 0.14, 0.07, 0.90),    // deep blue, belly on the left
-        (Color(red: 0.43, green: 0.82, blue: 1.0), -0.85, 0.60, 0.06, 0.07, 0.05, 0.85),    // cyan above the blue
-        (Color.white, -0.97, 0.97, 0.0, 0.024, 0.022, 0.95),                                // white-hot core
+        (Color(red: 1.0, green: 0.27, blue: 0.16), -0.45, 0.98, -0.13, 0.13, 0.07, 0.85),
+        (Color(red: 1.0, green: 0.67, blue: 0.24), -0.75, 0.80, -0.06, 0.07, 0.05, 0.85),
+        (Color(red: 0.16, green: 0.35, blue: 1.0), -0.98, 0.45, 0.13, 0.14, 0.07, 0.90),
+        (Color(red: 0.43, green: 0.82, blue: 1.0), -0.85, 0.60, 0.06, 0.07, 0.05, 0.85),
+        (Color.white, -0.97, 0.97, 0.0, 0.024, 0.022, 0.95),
     ]
 
     /// A band between two curves that tapers to a point at both ends.
@@ -323,50 +323,78 @@ struct Orb: View {
     static func arc(_ c: CGPoint, _ r: Double, _ a0: Double, _ a1: Double) -> Path {
         var p = Path(); p.addArc(center: c, radius: r, startAngle: .degrees(a0), endAngle: .degrees(a1), clockwise: false); return p
     }
+    /// The jelly outline: a circle pushed in and out by three slow waves, plus a soft squash and stretch.
+    static func blob(_ c: CGPoint, _ r: Double, _ t: Double, _ amp: Double, _ squash: Double) -> Path {
+        var p = Path()
+        let n = 96
+        for i in 0...n {
+            let th = Double(i) / Double(n) * 2 * Double.pi
+            let k = 1 + amp * (0.55 * sin(3 * th + t * 1.9) + 0.45 * sin(2 * th - t * 1.3) + 0.25 * sin(5 * th + t * 2.7))
+            let pt = CGPoint(x: c.x + cos(th) * r * k * (1 + squash), y: c.y + sin(th) * r * k * (1 - squash))
+            if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+        }
+        p.closeSubpath()
+        return p
+    }
 
     var body: some View {
         TimelineView(.animation) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 10000)
             let k: Double = fast ? 1 : 0
+            // speech-like rhythm: three overlapping beats so it never looks like a steady pulse
+            let voice = talk * (0.5 + 0.5 * sin(t * 9.0)) * (0.6 + 0.4 * sin(t * 3.1 + 1)) * (0.7 + 0.3 * sin(t * 14.0 + 2))
             Canvas { ctx, sz in
                 let W = Double(sz.width)
-                let r = W * 0.46
+                let r = W * 0.42
                 let cx = W / 2, cy = W / 2
                 let c = CGPoint(x: cx, y: cy)
-                let ball = Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
-                let phase = t * (0.9 + 1.8 * k)
-                let swell = 1 + 0.5 * k + 0.15 * k * sin(t * 5)
+                let amp = 0.016 + 0.020 * k + 0.050 * voice
+                let squash = 0.018 * sin(t * 2.2) * (0.5 + k) + 0.035 * voice * sin(t * 7)
+                let ball = Orb.blob(c, r, t * (1 + 0.8 * k + 1.5 * talk), amp, squash)
+                let phase = t * (0.9 + 1.8 * k + 1.2 * talk)
+                let swell = 1 + 0.5 * k + 0.6 * voice
                 func core(_ x: Double) -> Double { cy + sin((x - cx) / r * 1.7 + phase + 0.5) * 0.10 * r * swell }
 
-                // dark glass body
-                ctx.fill(ball, with: .radialGradient(Gradient(colors: [Color(white: 0.07), Color(white: 0.03)]),
-                                                     center: c, startRadius: 0, endRadius: r))
-                // faint haze in the top half, so it reads as glass and not a black disc
-                var haze = ctx
-                haze.clip(to: ball)
-                haze.addFilter(.blur(radius: r * 0.18))
-                haze.fill(Path(ellipseIn: CGRect(x: cx - r * 0.8, y: cy - r * 0.95, width: r * 1.6, height: r * 0.85)),
-                          with: .color(Color.white.opacity(0.10)))
+                // see-through glass body: darker in the middle so the light shows, clear at the edge
+                ctx.fill(ball, with: .radialGradient(Gradient(stops: [
+                    .init(color: Color.black.opacity(0.62), location: 0),
+                    .init(color: Color.black.opacity(0.40), location: 0.65),
+                    .init(color: Color.white.opacity(0.05), location: 1)]),
+                    center: CGPoint(x: cx, y: cy + r * 0.08), startRadius: 0, endRadius: r * 1.05))
                 // the ribbon of light
                 for (col, a, b, yo, th, bl, al) in Orb.ribbon {
                     var inn = ctx
                     inn.clip(to: ball)
                     inn.blendMode = .plusLighter
                     inn.addFilter(.blur(radius: max(0.3, r * bl)))
-                    let path = Orb.band(cx + a * r, cx + b * r, { x in core(x) + yo * r }, th * r * (1 + 0.3 * k))
-                    inn.fill(path, with: .color(col.opacity(al)))
+                    inn.fill(Orb.band(cx + a * r, cx + b * r, { x in core(x) + yo * r }, th * r * (1 + 0.3 * k + 0.35 * voice)),
+                             with: .color(col.opacity(al)))
                 }
-                // glass edge: a soft glow just inside the rim, brighter at the bottom, plus a thin crisp line
-                let rimShade = GraphicsContext.Shading.linearGradient(
-                    Gradient(colors: [Color.white.opacity(0.38), Color.white.opacity(0.38), Color.white.opacity(0.78)]),
+                // misty rim inside the glass: soft all round, brightest at the bottom
+                let rim = GraphicsContext.Shading.linearGradient(
+                    Gradient(colors: [Color.white.opacity(0.55), Color.white.opacity(0.30), Color.white.opacity(0.95)]),
                     startPoint: CGPoint(x: cx, y: cy - r), endPoint: CGPoint(x: cx, y: cy + r))
-                var soft = ctx
-                soft.clip(to: ball)
-                soft.blendMode = .plusLighter
-                soft.addFilter(.blur(radius: max(0.5, r * 0.05)))
-                soft.stroke(ball, with: rimShade, lineWidth: max(1, r * 0.06))
-                ctx.stroke(ball, with: rimShade, lineWidth: max(0.5, r * 0.012))
-                // colour where the ribbon meets the glass: amber and blue on the left, white on the right
+                var mist = ctx
+                mist.clip(to: ball)
+                mist.blendMode = .plusLighter
+                mist.addFilter(.blur(radius: max(0.6, r * 0.07)))
+                mist.stroke(ball, with: rim, lineWidth: max(1.5, r * 0.16))
+                // highlight on top, like light from a window
+                var top = ctx
+                top.clip(to: ball)
+                top.addFilter(.blur(radius: max(0.4, r * 0.05)))
+                top.fill(Path(ellipseIn: CGRect(x: cx - r * 0.62, y: cy - r * 0.93, width: r * 1.24, height: r * 0.46)),
+                         with: .linearGradient(Gradient(colors: [Color.white.opacity(0.55), Color.white.opacity(0.0)]),
+                                               startPoint: CGPoint(x: cx, y: cy - r * 0.93), endPoint: CGPoint(x: cx, y: cy - r * 0.47)))
+                top.fill(Path(ellipseIn: CGRect(x: cx - r * 0.50, y: cy - r * 0.66, width: r * 0.20, height: r * 0.12)),
+                         with: .color(Color.white.opacity(0.75)))
+                // caustic glow along the bottom
+                var low = ctx
+                low.clip(to: ball)
+                low.blendMode = .plusLighter
+                low.addFilter(.blur(radius: max(0.5, r * 0.04)))
+                low.stroke(Orb.arc(c, r * 0.90, 35, 145), with: .color(Color.white.opacity(0.55 + 0.3 * voice)), lineWidth: max(0.8, r * 0.05))
+                // colour bending where the ribbon meets the glass
                 var edge = ctx
                 edge.clip(to: ball)
                 edge.blendMode = .plusLighter
@@ -375,13 +403,15 @@ struct Orb: View {
                 edge.stroke(Orb.arc(c, r * 0.97, 182, 205), with: .color(Color(red: 1, green: 0.6, blue: 0.2).opacity(0.9)), lineWidth: w)
                 edge.stroke(Orb.arc(c, r * 0.97, 150, 178), with: .color(Color(red: 0.2, green: 0.45, blue: 1).opacity(0.9)), lineWidth: w)
                 edge.stroke(Orb.arc(c, r * 0.97, -8, 14), with: .color(Color.white.opacity(0.7)), lineWidth: w)
+                // the crisp edge of the glass
+                ctx.stroke(ball, with: .color(Color.white.opacity(0.50)), lineWidth: max(0.6, r * 0.016))
             }
             .frame(width: size, height: size)
-            .scaleEffect(1 + (fast ? 0.03 * sin(t * 5) : 0.012 * sin(t * 1.6)))
         }
         .accessibilityLabel("Nova")
     }
 }
+
 
 /// The notch turning into the glass island while Nova thinks or speaks: it hangs from the notch.
 struct LiquidIsland: View {
@@ -394,18 +424,17 @@ struct LiquidIsland: View {
     let notchH: CGFloat
     var body: some View {
         GeometryReader { geo in
-            let side: CGFloat = 92
+            let side: CGFloat = 132
             ZStack(alignment: .top) {
                 TimelineView(.animation) { tl in
                     let t = tl.date.timeIntervalSinceReferenceDate
                     // a speech-like rhythm: three overlapping beats, so it never looks like a steady pulse
-                    let voice = speaking ? (0.5 + 0.5 * sin(t * 9.0)) * (0.6 + 0.4 * sin(t * 3.1 + 1)) * (0.7 + 0.3 * sin(t * 14.0 + 2)) : 0
                     ZStack {
-                        Circle().fill(Color.black.opacity(0.55)).blur(radius: 14).frame(width: side * 1.15, height: side * 1.15)
-                        Orb(size: side, fast: true)
-                            .scaleEffect(1 + 0.10 * voice)
+                        Circle().fill(Color.black.opacity(0.28)).blur(radius: 18).frame(width: side * 1.05, height: side * 1.05)
+                        Orb(size: side, fast: true, talk: speaking ? 1 : 0)
+                            .offset(y: 3 * sin(t * 1.6))          // floats gently
                     }
-                    .frame(width: side * 1.3, height: side * 1.3)
+                    .frame(width: side * 1.3, height: side * 1.12)
                 }
                 .padding(.top, notchH - 4)
                 if let caption, !caption.isEmpty {
@@ -415,7 +444,7 @@ struct LiquidIsland: View {
                         .padding(.horizontal, 14).padding(.vertical, 8)
                         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.black.opacity(0.82)))
                         .frame(maxWidth: geo.size.width - 8)
-                        .padding(.top, notchH + side * 1.3 - 6)
+                        .padding(.top, notchH + side * 1.12 - 2)
                         .transition(.opacity)
                 }
                 Rectangle().fill(Color.black).frame(width: notchW, height: notchH)   // the real notch on top

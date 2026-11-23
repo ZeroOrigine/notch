@@ -1,6 +1,7 @@
 // Notch — preferences, action log, bug reports and the Settings window.
 import Cocoa
 import SwiftUI
+import AVFoundation
 
 func onMain(_ f: @escaping @MainActor () -> Void) { Task { @MainActor in f() } }
 func later(_ seconds: Double, _ f: @escaping @MainActor () -> Void) {
@@ -38,6 +39,9 @@ final class Prefs: ObservableObject {
     @Published var chatMode = Prefs.b("chatMode", true) { didSet { save("chatMode", chatMode) } }
     @Published var useApps = Prefs.b("useApps", true) { didSet { save("useApps", useApps) } }
     @Published var stars = Prefs.b("stars", true) { didSet { save("stars", stars) } }
+    @Published var lockDuringCalls = Prefs.b("lockDuringCalls", true) { didSet { save("lockDuringCalls", lockDuringCalls) } }
+    @Published var voiceID = UserDefaults.standard.string(forKey: "voiceID") ?? "" { didSet { save("voiceID", voiceID) } }
+    @Published var voiceRate = UserDefaults.standard.object(forKey: "voiceRate") as? Double ?? 0.52 { didSet { save("voiceRate", voiceRate) } }
     @Published var updateAlerts = Prefs.b("updateAlerts", true) { didSet { save("updateAlerts", updateAlerts) } }
     @Published var scale = (UserDefaults.standard.object(forKey: "scale") as? Double) ?? 0.8 { didSet { save("scale", scale) } }
     @Published var fixStyle = UserDefaults.standard.string(forKey: "fixStyle") ?? "fix spelling and grammar and make it clear" { didSet { save("fixStyle", fixStyle) } }
@@ -162,6 +166,7 @@ struct SettingsView: View {
     @ObservedObject var p = Prefs.shared
     @ObservedObject var ui = UIState.shared
     @ObservedObject var up = Updater.shared
+    @ObservedObject var nova = Nova.shared
 
     let languages = [("Spanish", "es-ES"), ("Hindi", "hi-IN"), ("French", "fr-FR"), ("German", "de-DE"),
                      ("Punjabi", "pa-IN"), ("Marathi", "mr-IN"), ("Chinese", "zh-CN"), ("Arabic", "ar-SA")]
@@ -218,6 +223,18 @@ struct SettingsView: View {
                 if let n = up.available?.notes, !n.isEmpty { Text(n).font(.system(size: 12)).foregroundStyle(.secondary) }
                 row("Tell me when an update is ready", "NoTcH OS checks once a day and lets you know.", $p.updateAlerts)
             }
+            Section("Quiet lock") {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(nova.locked ? "NoTcH OS is locked" : "NoTcH OS is on").font(.system(size: 13, weight: .semibold))
+                        Text("Locked: Nova does not listen, look, talk, pop up or open. Press ⌥⌘L or use the menu bar to switch.")
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(nova.locked ? "Unlock" : "Lock now") { nova.toggleLock() }.buttonStyle(.borderedProminent)
+                }
+                row("Lock by itself during calls", "When Zoom, Teams, FaceTime, Meet or another app uses the microphone, NoTcH OS goes quiet, and comes back when the call ends.", $p.lockDuringCalls)
+            }
             Section("Screen privacy") {
                 row("Screen guard", "Blurs your whole screen when a second face looks over your shoulder. Uses this Mac's camera, nothing leaves the Mac. Also in the menu bar, the Controls tab, or say “screen guard on”.", $p.shoulderGuard)
                 row("Hide NoTcH OS from screen sharing", "Screenshots and shared screens (Zoom, Teams, Meet) skip NoTcH OS and your chats with Nova. A few newer capture apps may still see it.", $p.stealth)
@@ -244,6 +261,21 @@ struct SettingsView: View {
             Section("Microphone features") {
                 row("“Hey Nova” wake word", "Listens all the time, on this Mac only.", $p.wakeWord)
                 row("Nova speaks answers aloud", "", $p.voiceReply)
+                Picker("Nova's voice", selection: $p.voiceID) {
+                    Text("Best on this Mac (\(Nova.bestVoice?.name ?? "default"))").tag("")
+                    ForEach(VoiceList.voices, id: \.identifier) { v in Text(VoiceList.label(v)).tag(v.identifier) }
+                }
+                HStack {
+                    Text("Speed").font(.system(size: 12))
+                    Slider(value: $p.voiceRate, in: 0.42...0.62)
+                    Button("Try it") { Nova.shared.speak("Hi, I'm Nova. Ask me anything, I'm right here in your notch.") }
+                }
+                HStack {
+                    Text("The most natural voices are free from Apple. Download one marked Premium, like Zoe or Ava, then pick it here.")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Get voices") { VoiceList.openVoiceSettings() }
+                }
                 row("Chat mode", "After Nova talks, it listens again. Say “stop” or “thanks” to end.", $p.chatMode)
             }
             Section("Nova powers") {
@@ -361,5 +393,27 @@ struct SettingsView: View {
             Text(ui.bugStatus).font(.system(size: 12)).foregroundStyle(.secondary)
             Spacer()
         }.padding(10)
+    }
+}
+
+
+/// English voices installed on this Mac, best first, for the voice picker.
+@MainActor
+enum VoiceList {
+    static var voices: [AVSpeechSynthesisVoice] {
+        AVSpeechSynthesisVoice.speechVoices()
+            .filter { $0.language.hasPrefix("en") }
+            .sorted { ($0.quality.rawValue, $0.name) > ($1.quality.rawValue, $1.name) }
+    }
+    static func label(_ v: AVSpeechSynthesisVoice) -> String {
+        let q = v.quality == .premium ? " · Premium" : v.quality == .enhanced ? " · Enhanced" : ""
+        return "\(v.name) (\(v.language))\(q)"
+    }
+    /// Opens System Settings at Accessibility > Spoken Content, where Apple's natural voices are downloaded for free.
+    static func openVoiceSettings() {
+        for s in ["x-apple.systempreferences:com.apple.Accessibility-Settings.extension?SpokenContent",
+                  "x-apple.systempreferences:com.apple.preference.universalaccess?SpokenContent"] {
+            if let u = URL(string: s), NSWorkspace.shared.open(u) { return }
+        }
     }
 }

@@ -271,6 +271,10 @@ enum Tab: Int { case home, controls, ask, music, notes, timer, clips }
 final class Nova: ObservableObject {
     static let shared = Nova()
     @Published var expanded = false
+    /// 6.0 Quiet lock: Nova stays silent and asleep until unlocked.
+    @Published var locked = false
+    var lockedByCall = false
+    let calls = CallWatch()
     @Published var tab: Tab = .home
     @Published var input = ""
     @Published var reply = "Hi. Ask me anything, or say “open Excel”."
@@ -358,6 +362,7 @@ final class Nova: ObservableObject {
         prefs.changed = { onMain { Nova.shared.applyPrefs() } }
         wake.onWake = { onMain { Nova.shared.heard() } }
         faceWatch.onCount = { n in onMain { Nova.shared.handleFaces(n) } }
+        calls.changed = { onCall in Nova.shared.callChanged(onCall) }
         applyPrefs()
         refresh()
         Log.add("Notch started")
@@ -365,9 +370,10 @@ final class Nova: ObservableObject {
         fetchWeather()
     }
     func applyPrefs() {
+        if prefs.lockDuringCalls { calls.start() } else { calls.stop(); if lockedByCall { unlock() } }
+        if locked { return }          // nothing wakes up while locked
         let cam = prefs.faceWake || prefs.shoulderGuard || prefs.autoLock
-        if cam && !faceWatch.running { faceWatch.start() }
-        if !cam && faceWatch.running { faceWatch.stop(); privacy.hide() }
+        if cam { faceWatch.start() } else { faceWatch.stop(); privacy.hide() }
         if !prefs.shoulderGuard { privacy.hide() }
         if prefs.wakeWord { if !listening { wake.start() } } else { wake.stop() }
         if !prefs.weather { weatherText = "" } else if weatherText.isEmpty { fetchWeather() }
@@ -378,6 +384,7 @@ final class Nova: ObservableObject {
     // MARK: chat mode, stop, transcript
 
     func speechEnded() {
+        if synth.isSpeaking { return }          // more sentences are queued
         withAnimation(.easeOut(duration: 0.3)) { speaking = false }
         guard chatting, prefs.chatMode, !listening, !thinking else { return }
         later(0.35) { if self.chatting && !self.listening && !self.thinking { self.startListening(locale: "en-IN", translate: false) } }
@@ -402,9 +409,45 @@ final class Nova: ObservableObject {
         notchBrain.reset(); claudeBrain?.reset()
         reply = "New chat. What can I do?"
     }
-    func resumeWake() { if prefs.wakeWord && !listening { later(0.8) { if !self.listening { self.wake.start() } } } }
+    // MARK: quiet lock (6.0)
+
+    func lock(byCall: Bool = false) {
+        guard !locked else { return }
+        job?.cancel(); job = nil
+        synth.stopSpeaking(at: .immediate)
+        if listening { listener.stop() }
+        wake.stop()
+        faceWatch.stop()
+        privacy.hide()
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { listening = false; thinking = false; speaking = false; chatting = false; acting = false }
+        status = ""; steps = []
+        AppDelegate.shared?.close()
+        lockedByCall = byCall
+        showBanner(byCall ? "On a call · NoTcH OS is quiet" : "NoTcH OS locked", .gray, seconds: 2.2)
+        locked = true
+        AppDelegate.shared?.lockChanged()
+        Log.add(byCall ? "Locked for a call" : "Locked")
+    }
+    func unlock() {
+        guard locked else { return }
+        locked = false; lockedByCall = false
+        applyPrefs()
+        AppDelegate.shared?.lockChanged()
+        if missedTimer { missedTimer = false; NSSound(named: "Glass")?.play(); notify("Your timer finished while NoTcH OS was locked.") }
+        else { showBanner("NoTcH OS is back", .green, seconds: 2) }
+        Log.add("Unlocked")
+    }
+    func toggleLock() { if locked { unlock() } else { lock() } }
+    func callChanged(_ onCall: Bool) {
+        guard prefs.lockDuringCalls else { return }
+        if onCall && !locked { lock(byCall: true) }
+        if !onCall && locked && lockedByCall { unlock() }
+    }
+
+    func resumeWake() { if prefs.wakeWord && !listening && !locked { later(0.8) { if !self.listening { self.wake.start() } } } }
 
     func showBanner(_ text: String, _ color: Color, seconds: Double) {
+        if locked { return }
         withAnimation(.spring(response: 0.45, dampingFraction: 0.72)) { banner = text; bannerColor = color }
         if seconds > 0 { later(seconds) { if self.banner == text { withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) { self.banner = nil } } } }
     }
@@ -415,6 +458,7 @@ final class Nova: ObservableObject {
         return name.isEmpty ? part : "\(part), \(name)"
     }
     func handleFaces(_ n: Int) {
+        guard !locked else { return }
         let now = Date()
         if n > 0 {
             let away = lastSeen.map { now.timeIntervalSince($0) } ?? 999
@@ -431,19 +475,31 @@ final class Nova: ObservableObject {
             multi = 0
             if privacy.isShown { privacy.hide(); withAnimation { banner = nil } }
         }
-        if multi >= 2 && !privacy.isShown {
+        if multi >= 3 && !privacy.isShown {
             privacy.show()
             showBanner("Someone behind you · screen hidden", .red, seconds: 0)
             Log.add("Shoulder guard on")
         }
     }
 
-    /// The best British English voice installed on this Mac.
-    static let voice: AVSpeechSynthesisVoice? = {
-        let all = AVSpeechSynthesisVoice.speechVoices().filter { $0.language == "en-GB" }
-        let best = all.max { a, b in a.quality.rawValue < b.quality.rawValue }
-        return best ?? AVSpeechSynthesisVoice(language: "en-GB")
+    /// Nova's voice: the one picked in Settings, else the most natural English voice on this Mac
+    /// (Premium beats Enhanced beats the basic voices; novelty voices are never chosen).
+    static var voice: AVSpeechSynthesisVoice? {
+        if let id = UserDefaults.standard.string(forKey: "voiceID"), !id.isEmpty, let v = AVSpeechSynthesisVoice(identifier: id) { return v }
+        return bestVoice
+    }
+    static let bestVoice: AVSpeechSynthesisVoice? = {
+        let novelty = ["Albert", "Bad News", "Bahh", "Bells", "Boing", "Bubbles", "Cellos", "Good News", "Jester", "Organ", "Superstar",
+                       "Trinoids", "Whisper", "Wobble", "Zarvox", "Fred", "Junior", "Ralph", "Kathy", "Grandma", "Grandpa", "Rocko",
+                       "Eddy", "Flo", "Reed", "Sandy", "Shelley"]
+        let langs = ["en-US": 3, "en-GB": 3, "en-AU": 2, "en-IN": 2, "en-IE": 1, "en-ZA": 1]
+        let all = AVSpeechSynthesisVoice.speechVoices().filter { v in langs[v.language] != nil && !novelty.contains(where: { v.name.hasPrefix($0) }) }
+        func score(_ v: AVSpeechSynthesisVoice) -> Int {
+            v.quality.rawValue * 100 + (langs[v.language] ?? 0) * 10 + (["Zoe", "Ava", "Serena", "Samantha", "Evan", "Daniel", "Karen", "Moira"].contains(where: { v.name.hasPrefix($0) }) ? 5 : 0)
+        }
+        return all.max { score($0) < score($1) } ?? AVSpeechSynthesisVoice(language: "en-US")
     }()
+    static var rate: Float { Float(UserDefaults.standard.object(forKey: "voiceRate") as? Double ?? 0.52) }
 
     // MARK: system state
 
@@ -472,6 +528,15 @@ final class Nova: ObservableObject {
         }
         awake = on
     }
+    var missedTimer = false
+    /// Called every second by the app, whatever is on screen.
+    func checkTimer() {
+        guard let e = timerEnd, Date() >= e else { return }
+        withAnimation { timerEnd = nil }
+        if locked { missedTimer = true; return }
+        NSSound(named: "Glass")?.play()
+        notify("Your timer is done.")
+    }
     func startTimer(_ m: Double) {
         withAnimation(.spring(response: 0.45, dampingFraction: 0.7)) { timerEnd = Date().addingTimeInterval(m * 60) }
     }
@@ -480,13 +545,29 @@ final class Nova: ObservableObject {
         if prefs.sounds { NSSound(named: c == .red ? "Basso" : "Tink")?.play() }
         later(1.3) { withAnimation(.easeIn(duration: 0.4)) { self.flash = nil } }
     }
-    func speak(_ s: String) {
-        guard prefs.voiceReply, !s.hasPrefix("⚠︎") else { return }
-        synth.stopSpeaking(at: .immediate)
-        let u = AVSpeechUtterance(string: s)
-        u.voice = Nova.voice
-        u.rate = 0.5
-        synth.speak(u)
+    func speak(_ s: String, interrupt: Bool = true) {
+        guard prefs.voiceReply, !locked, !s.hasPrefix("⚠︎") else { return }
+        if interrupt { synth.stopSpeaking(at: .immediate) }
+        for part in Nova.spokenParts(s) {
+            let u = AVSpeechUtterance(string: part)
+            u.voice = Nova.voice
+            u.rate = Nova.rate
+            u.pitchMultiplier = 1.04
+            u.postUtteranceDelay = 0.14          // a breath between sentences, like a person
+            synth.speak(u)
+        }
+    }
+    /// Text as it should be said out loud: symbols become words, and it is cut into sentences.
+    static func spokenParts(_ s: String) -> [String] {
+        var t = s
+        for (a, b) in [("°C", " degrees"), ("°F", " degrees Fahrenheit"), ("°", " degrees"), ("%", " percent"), ("&", " and "),
+                       (" km/h", " kilometres an hour"), (" mm", " millimetres"), ("e.g.", "for example"), ("i.e.", "that is"),
+                       ("—", ", "), ("–", " to "), ("·", ","), ("•", ","), ("*", ""), ("#", "")] { t = t.replacingOccurrences(of: a, with: b) }
+        var out: [String] = []
+        t.enumerateSubstrings(in: t.startIndex..<t.endIndex, options: .bySentences) { sub, _, _, _ in
+            if let x = sub?.trimmingCharacters(in: .whitespacesAndNewlines), !x.isEmpty { out.append(x) }
+        }
+        return out.isEmpty ? [t] : out
     }
 
     func fetchWeather() {
@@ -619,7 +700,10 @@ final class Nova: ObservableObject {
         let pb = NSPasteboard.general
         guard pb.changeCount != lastClip else { return }
         lastClip = pb.changeCount
-        guard prefs.clipboard, let s = pb.string(forType: .string) else { return }
+        guard prefs.clipboard, !locked, let s = pb.string(forType: .string) else { return }
+        // Never keep passwords: password managers mark what they copy as concealed or transient.
+        let secret = ["org.nspasteboard.ConcealedType", "org.nspasteboard.TransientType", "org.nspasteboard.AutoGeneratedType", "com.agilebits.onepassword"]
+        if let types = pb.types, types.contains(where: { secret.contains($0.rawValue) }) { return }
         let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty, t.count < 4000 else { return }
         clips.removeAll { $0 == t }
@@ -652,7 +736,7 @@ final class Nova: ObservableObject {
             let c = await CalendarService.shared.briefLine()
             let line = [w, c].compactMap { $0 }.joined(separator: " ")
             self.reply = base + " " + line
-            if self.prefs.voiceReply { let u = AVSpeechUtterance(string: line); u.voice = Nova.voice; u.rate = 0.5; self.synth.speak(u) }
+            if !line.isEmpty { self.speak(line, interrupt: false) }
         }
         return base
     }
@@ -711,6 +795,7 @@ final class Nova: ObservableObject {
     private var wasCharging: Bool?
     /// Say something out loud and show it under the notch.
     func notify(_ text: String, _ color: Color = .green) {
+        if locked { Log.add("(quiet) \(text)"); return }
         if !expanded { showBanner(text, color, seconds: 4.5) }
         speak(text)
         Log.add("Nova said: \(text)")
@@ -825,6 +910,7 @@ final class Nova: ObservableObject {
     // MARK: voice
 
     func heard() {
+        guard !locked else { return }
         Log.add("Wake word")
         if prefs.sounds { NSSound(named: "Pop")?.play() }
         AppDelegate.shared?.open(tab: .ask)
@@ -832,6 +918,7 @@ final class Nova: ObservableObject {
         startListening(locale: "en-IN", translate: false)
     }
     func toggleMic() {
+        guard !locked else { return }
         if listening { listener.stop(); withAnimation { listening = false }; chatting = false; resumeWake(); return }
         synth.stopSpeaking(at: .immediate)
         chatting = true
@@ -1002,6 +1089,7 @@ struct NotchRoot: View {
     let notchH: CGFloat
 
     var liveWidth: CGFloat {
+        if g.locked { return notchW }
         if g.thinking || g.listening || g.speaking || g.timerEnd != nil || g.flash != nil { return notchW + 190 }
         if g.track?.playing == true { return notchW + 120 }
         return notchW
@@ -1011,12 +1099,12 @@ struct NotchRoot: View {
     /// The notch drops into the liquid glass island while Nova thinks or speaks.
     /// Nova's sphere under the notch while she thinks or speaks. It wins over the text banner:
     /// before 5.8 the banner (which carries every spoken reply) hid the sphere, so it almost never showed.
-    var drop: Bool { g.prefs.liquidIsland && !g.expanded && !glass && (g.thinking || g.speaking) }
+    var drop: Bool { g.prefs.liquidIsland && !g.locked && !g.expanded && !glass && (g.thinking || g.speaking) }
     var k: CGFloat { (g.expanded || glass) ? CGFloat(g.prefs.scale) : 1 }
     var size: CGSize {
-        if glass { return CGSize(width: 540, height: notchH + 204) }
+        if glass { return CGSize(width: 560, height: notchH + 232) }
         if g.expanded { return CGSize(width: 660, height: g.openHeight) }
-        if drop { return g.banner != nil ? CGSize(width: 460, height: notchH + 118 + 64) : CGSize(width: notchW + 120, height: notchH + 118) }
+        if drop { return g.banner != nil ? CGSize(width: 480, height: notchH + 170 + 64) : CGSize(width: max(notchW + 130, 330), height: notchH + 170) }
         if g.banner != nil { return CGSize(width: 440, height: notchH + 50) }
         return CGSize(width: liveWidth, height: notchH)
     }
@@ -1057,7 +1145,7 @@ struct NotchRoot: View {
                 } else {
                     blackBack
                 }
-                if !drop {
+                if !drop && (!g.locked || g.banner != nil) {
                     content
                         .padding(.horizontal, 9)
                         .clipShape(NotchShape(radius: radius))
@@ -1234,9 +1322,6 @@ struct TimerText: View {
             let left = max(0, end.timeIntervalSince(tl.date))
             Text(String(format: "%d:%02d", Int(left) / 60, Int(left) % 60))
                 .font(.system(size: size, weight: .bold, design: .rounded)).monospacedDigit().foregroundStyle(.orange)
-                .onChange(of: left <= 0) { done in
-                    if done { Nova.shared.timerEnd = nil; NSSound(named: "Glass")?.play(); Nova.shared.notify("Your timer is done.") }
-                }
         }
     }
 }
@@ -1672,7 +1757,7 @@ struct GlassListen: View {
     var body: some View {
         VStack(spacing: 6) {
             Spacer().frame(height: notchH + 6)
-            Orb(size: 96, fast: true)   // Nova's sphere is the talking AI (founder, 2026-11-18)
+            Orb(size: 124, fast: true, talk: 0.35)   // Nova's sphere is the talking AI (founder, 2026-11-18)
             Text(g.input.isEmpty ? "Listening…" : "“\(g.input)”")
                 .font(.system(size: 22, weight: .semibold)).lineLimit(2).multilineTextAlignment(.center)
                 .shadow(color: Color.black.opacity(0.5), radius: 6)
@@ -1773,7 +1858,7 @@ struct AskView: View {
             }
         } else {
             HStack(alignment: .top, spacing: 14) {
-            Orb(size: 60, fast: g.speaking)
+            Orb(size: 60, fast: g.speaking, talk: g.speaking ? 1 : 0)
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
                     NovaWord(size: 17)
@@ -1838,6 +1923,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let glow = EdgeGlow()
     var guardItem: NSMenuItem?
     var updateItem: NSMenuItem?
+    var lockItem: NSMenuItem?
     var stealthItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ n: Notification) {
@@ -1868,7 +1954,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         timers.append(Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { _ in
             onMain { Nova.shared.pollMusic(); Nova.shared.checkBattery() }
         })
-        timers.append(Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in onMain { Nova.shared.pollClipboard() } })
+        timers.append(Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in onMain { Nova.shared.pollClipboard(); Nova.shared.checkTimer() } })
         timers.append(Timer.scheduledTimer(withTimeInterval: 1800, repeats: true) { _ in onMain { Nova.shared.fetchWeather() } })
         timers.append(Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { _ in onMain { AppDelegate.shared?.updateGlow() } })
         registerHotKey()
@@ -1907,6 +1993,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let m = NSMenu()
         m.addItem(withTitle: "Open NoTcH OS", action: #selector(menuApp), keyEquivalent: "").target = self
         m.addItem(withTitle: "Talk to Nova  (⌥⌘G)", action: #selector(menuOpen), keyEquivalent: "").target = self
+        let li = m.addItem(withTitle: "Lock NoTcH OS  (⌥⌘L)", action: #selector(menuLock), keyEquivalent: "")
+        li.target = self; lockItem = li
         m.addItem(withTitle: "Settings…", action: #selector(menuSettings), keyEquivalent: ",").target = self
         m.addItem(withTitle: "Report a bug…", action: #selector(menuBug), keyEquivalent: "").target = self
         let ui = m.addItem(withTitle: "Check for Updates…", action: #selector(menuUpdate), keyEquivalent: "")
@@ -1928,6 +2016,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func menuBug() { showMain(.bug) }
     @objc func menuGuard() { _ = Nova.shared.setScreenGuard(!Prefs.shared.shoulderGuard) }
     @objc func menuStealth() { Prefs.shared.stealth.toggle() }
+    @objc func menuLock() { Nova.shared.toggleLock() }
+    func lockChanged() {
+        let l = Nova.shared.locked
+        statusItem?.button?.image = NSImage(systemSymbolName: l ? "lock.fill" : "sparkles", accessibilityDescription: l ? "NoTcH OS locked" : "NoTcH OS")
+        lockItem?.title = l ? "Unlock NoTcH OS  (⌥⌘L)" : "Lock NoTcH OS  (⌥⌘L)"
+        updateGlow()
+    }
     @objc func menuUpdate() {
         let u = Updater.shared
         Task { @MainActor in
@@ -1936,6 +2031,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
     func menuNeedsUpdate(_ menu: NSMenu) {
+        lockItem?.title = Nova.shared.locked ? "Unlock NoTcH OS  (⌥⌘L)" : "Lock NoTcH OS  (⌥⌘L)"
         guardItem?.state = Prefs.shared.shoulderGuard ? .on : .off
         stealthItem?.state = Prefs.shared.stealth ? .on : .off
         if let v = Updater.shared.available { updateItem?.title = "Install NoTcH OS \(v.version)…" } else { updateItem?.title = "Check for Updates…" }
@@ -1943,7 +2039,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Rainbow edge while Nova listens, thinks or speaks.
     func updateGlow() {
         let g = Nova.shared
-        glow.set(Prefs.shared.screenGlow && (g.listening || g.thinking || g.speaking), screen: screen, hiddenFromSharing: Prefs.shared.stealth)
+        glow.set(Prefs.shared.screenGlow && !g.locked && (g.listening || g.thinking || g.speaking), screen: screen, hiddenFromSharing: Prefs.shared.stealth)
     }
     /// "Hide Notch from screen sharing": screenshots and shared screens skip Notch's own windows.
     /// The shoulder-guard blur is never hidden, so it still covers your screen in a share.
@@ -1998,7 +2094,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !g.expanded {
             let inside = notchRect(expanded: false).contains(m)
             let dragging = NSEvent.pressedMouseButtons & 1 == 1
-            if inside && (g.prefs.hoverOpen || (dragging && g.prefs.fileDrop)) { open() }
+            if inside && !g.locked && (g.prefs.hoverOpen || (dragging && g.prefs.fileDrop)) { open() }
         } else {
             if notchRect(expanded: true).insetBy(dx: -24, dy: -24).contains(m) || g.pinned {
                 leaveTime = nil
@@ -2029,10 +2125,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     var fixKeyRef: EventHotKeyRef?
     var stopKeyRef: EventHotKeyRef?
+    var lockKeyRef: EventHotKeyRef?
     func registerHotKey() {
         hotKeyAction = { id in
             onMain {
                 guard let d = AppDelegate.shared else { return }
+                if id == 4 { Nova.shared.toggleLock(); return }
+                if Nova.shared.locked { return }
                 if id == 2 { Nova.shared.fixSelection(); return }
                 if id == 3 { Nova.shared.stopAll(); return }
                 if Nova.shared.expanded && Nova.shared.tab == .ask { d.close() }
@@ -2049,12 +2148,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         RegisterEventHotKey(UInt32(kVK_ANSI_G), UInt32(cmdKey | optionKey), EventHotKeyID(signature: OSType(0x4E4F_5443), id: 1), GetApplicationEventTarget(), 0, &hotKeyRef)
         RegisterEventHotKey(UInt32(kVK_ANSI_X), UInt32(cmdKey | optionKey), EventHotKeyID(signature: OSType(0x4E4F_5443), id: 2), GetApplicationEventTarget(), 0, &fixKeyRef)
         RegisterEventHotKey(UInt32(kVK_ANSI_Period), UInt32(cmdKey | optionKey), EventHotKeyID(signature: OSType(0x4E4F_5443), id: 3), GetApplicationEventTarget(), 0, &stopKeyRef)
+        RegisterEventHotKey(UInt32(kVK_ANSI_L), UInt32(cmdKey | optionKey), EventHotKeyID(signature: OSType(0x4E4F_5443), id: 4), GetApplicationEventTarget(), 0, &lockKeyRef)
     }
 }
 
 @main
 struct Main {
     @MainActor static func main() {
+        let me = ProcessInfo.processInfo.processIdentifier
+        if let other = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "com.notch.app")
+            .first(where: { $0.processIdentifier != me && !$0.isTerminated }) {
+            other.activate()
+            exit(0)
+        }
         let app = NSApplication.shared
         let d = AppDelegate()
         app.delegate = d
