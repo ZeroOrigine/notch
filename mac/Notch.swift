@@ -311,6 +311,16 @@ final class Nova: ObservableObject {
     @Published var banner: String?
     @Published var bannerColor: Color = .green
     @Published var dropped: URL?
+    // 6.2 everyday features
+    @Published var micUsers: [String] = []
+    @Published var cameraOn = false
+    @Published var micMuted = false
+    @Published var audioOut = ""
+    @Published var drives: [String] = []
+    let privacyLight = PrivacyLight()
+    let downloads = DownloadWatch()
+    private var fullWarned = false
+    private var wasPlugged: Bool?
 
     let prefs = Prefs.shared
     /// Every tool Nova can use (Tools.swift). One place to add a tool.
@@ -363,6 +373,18 @@ final class Nova: ObservableObject {
         wake.onWake = { onMain { Nova.shared.heard() } }
         faceWatch.onCount = { n in onMain { Nova.shared.handleFaces(n) } }
         calls.changed = { onCall in Nova.shared.callChanged(onCall) }
+        privacyLight.ownCamera = { Prefs.shared.faceWake || Prefs.shared.shoulderGuard || Prefs.shared.autoLock }
+        privacyLight.changed = { mic, cam in Nova.shared.privacyChanged(mic, cam) }
+        downloads.found = { u in Nova.shared.downloaded(u) }
+        let wsn = NSWorkspace.shared.notificationCenter
+        wsn.addObserver(forName: NSWorkspace.didMountNotification, object: nil, queue: .main) { n in
+            let u = n.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL
+            onMain { Nova.shared.driveMounted(u) }
+        }
+        wsn.addObserver(forName: NSWorkspace.didUnmountNotification, object: nil, queue: .main) { _ in
+            onMain { Nova.shared.drives = Drives.removable().map(\.lastPathComponent) }
+        }
+        drives = Drives.removable().map(\.lastPathComponent)
         applyPrefs()
         refresh()
         Log.add("Notch started")
@@ -377,6 +399,8 @@ final class Nova: ObservableObject {
         if !prefs.shoulderGuard { privacy.hide() }
         if prefs.wakeWord { if !listening { wake.start() } } else { wake.stop() }
         if !prefs.weather { weatherText = "" } else if weatherText.isEmpty { fetchWeather() }
+        if prefs.privacyLight { privacyLight.start() } else { privacyLight.stop(); micUsers = []; cameraOn = false }
+        if prefs.downloadAlerts { downloads.start() } else { downloads.stop() }
         LoginItem.set(prefs.openAtLogin)
         AppDelegate.shared?.applyStealth()
     }
@@ -509,8 +533,8 @@ final class Nova: ObservableObject {
         if let b = Brightness.get() { brightness = Double(b * 100) }
         bluetooth = Bluetooth.isOn()
         DispatchQueue.global().async {
-            let v = Sys.volume(), w = Sys.wifiOn(), t = Sys.nowPlaying()
-            onMain { self.volume = Double(v); self.wifi = w; self.track = t }
+            let v = Sys.volume(), w = Sys.wifiOn(), t = Sys.nowPlaying(), m = MicMute.isMuted(), o = AudioOut.currentName()
+            onMain { self.volume = Double(v); self.wifi = w; self.track = t; self.micMuted = m; self.audioOut = o }
         }
     }
     func pollMusic() {
@@ -537,6 +561,12 @@ final class Nova: ObservableObject {
         if t.contains("timer") { return "timer" }
         if t.contains("battery") || t.contains("charging") || t.contains("unplugged") { return "battery.75" }
         if t.contains("update") { return "arrow.down.circle.fill" }
+        if t.contains("mic muted") { return "mic.slash.fill" }
+        if t.hasPrefix("microphone on") || t.contains("mic is back") || t.contains("camera and mic") { return "mic.fill" }
+        if t.hasPrefix("camera is on") { return "video.fill" }
+        if t.hasPrefix("downloaded") { return "arrow.down.circle.fill" }
+        if t.contains("connected · say") || t.contains("unplug") && !t.contains("battery") || t.contains("still in use") { return "externaldrive.fill" }
+        if t.hasPrefix("reminder") { return "checklist" }
         if c == .red { return t.contains("someone") ? "person.2.fill" : "exclamationmark.circle.fill" }
         if c == .orange { return "touchid" }
         if t.contains("welcome") || t.contains("ready") || t.contains("morning") || t.contains("evening") || t.contains("afternoon") { return "sparkles" }
@@ -656,6 +686,31 @@ final class Nova: ObservableObject {
             let q = String(t.dropFirst(p.count))
             if let e = q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed), let url = URL(string: "https://www.google.com/search?q=" + e) {
                 NSWorkspace.shared.open(url); return "Searching for \(q)."
+            }
+        }
+        if t.contains("mic") || t.contains("microphone") {
+            if t.contains("unmute") || t.contains(" on") && !t.contains("mute") { return setMicMuted(false) + "." }
+            if t.contains("mute") || t.contains(" off") { return setMicMuted(true) + "." }
+        }
+        if t == "eject" || t.hasPrefix("eject ") || t.contains("eject the") || t.contains("eject my") { return ejectDrives() }
+        if t.contains("last download") || t.contains("my download") || t.contains("show download") { return downloads.revealLast() + "." }
+        if t.hasPrefix("remind me") {
+            var body = String(t.dropFirst("remind me".count)).trimmingCharacters(in: .whitespaces)
+            if body.hasPrefix("to ") { body = String(body.dropFirst(3)) }
+            var title = body
+            if let det = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.date.rawValue),
+               let m = det.firstMatch(in: body, range: NSRange(body.startIndex..., in: body)), let r = Range(m.range, in: body) {
+                title.removeSubrange(r)
+                title = title.replacingOccurrences(of: #"\s+(at|on|by|in)\s*$"#, with: "", options: .regularExpression)
+                    .trimmingCharacters(in: CharacterSet(charactersIn: " ,."))
+            }
+            let when = body
+            if !title.isEmpty {
+                Task { @MainActor in
+                    let r = await RemindersService.shared.add(title, when: when)
+                    self.notify(r, r.hasPrefix("Reminder set") ? .green : .orange)
+                }
+                return "On it."
             }
         }
         if t.contains("mute") { Sys.setVolume(0); volume = 0; return "Muted." }
@@ -818,8 +873,50 @@ final class Nova: ObservableObject {
         battery = b
         if b.0 <= 20 && !b.1 && !lowWarned { lowWarned = true; notify("Battery is at \(b.0) percent. Please plug in.", .red) }
         if b.1 { lowWarned = false }
-        if let w = wasCharging, w != b.1 { notify(b.1 ? "Charging. Battery at \(b.0) percent." : "Unplugged. Battery at \(b.0) percent.") }
+        // plugged / unplugged comes from the power source, not "charging": at 100% the Mac stops charging while still plugged in
+        let plugged = Power.pluggedIn()
+        if let w = wasPlugged, w != plugged { notify(plugged ? "Charging. Battery at \(b.0) percent." : "Unplugged. Battery at \(b.0) percent.") }
+        wasPlugged = plugged
         wasCharging = b.1
+        if !plugged { fullWarned = false }
+        else if prefs.fullChargeAlert && !fullWarned && b.0 >= prefs.fullChargeLevel {
+            fullWarned = true; notify("Battery is at \(b.0) percent. You can unplug now.")
+        }
+    }
+
+    // MARK: 6.2 everyday features
+    func privacyChanged(_ mic: [String], _ cam: Bool) {
+        let micNew = !mic.isEmpty && micUsers.isEmpty, camNew = cam && !cameraOn
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { micUsers = mic; cameraOn = cam }
+        if micNew && camNew { showBanner("Camera and mic on · \(mic.joined(separator: ", "))", .orange, seconds: 3.5) }
+        else if micNew { showBanner("Microphone on · \(mic.joined(separator: ", "))", .orange, seconds: 3.5) }
+        else if camNew { showBanner("Camera is on", .green, seconds: 3.5) }
+    }
+    func downloaded(_ u: URL) {
+        Log.add("Downloaded \(u.lastPathComponent)")
+        showBanner("Downloaded · \(u.lastPathComponent)", .blue, seconds: 4)
+    }
+    func driveMounted(_ u: URL?) {
+        drives = Drives.removable().map(\.lastPathComponent)
+        guard prefs.driveAlerts, let u, drives.contains(u.lastPathComponent) else { return }
+        showBanner("\(u.lastPathComponent) connected · say \"eject\" when done", .blue, seconds: 4.5)
+    }
+    func ejectDrives() -> String {
+        let r = Drives.ejectAll()
+        drives = Drives.removable().map(\.lastPathComponent)
+        showBanner(r, r.hasPrefix("Safe") ? .green : .orange, seconds: 4)
+        return r
+    }
+    func setMicMuted(_ on: Bool) -> String {
+        let r = MicMute.set(on)
+        micMuted = MicMute.isMuted()
+        showBanner(micMuted ? "Mic muted in every app" : "Mic is back on", micMuted ? .red : .green, seconds: 2.5)
+        return r
+    }
+    func setOutput(_ name: String) -> String {
+        let r = AudioOut.set(named: name)
+        audioOut = AudioOut.currentName()
+        return r
     }
 
     func send() {
@@ -1256,6 +1353,12 @@ struct NotchRoot: View {
 
     var header: some View {
         HStack(spacing: 12) {
+            if !g.micUsers.isEmpty || g.cameraOn {
+                HStack(spacing: 4) {
+                    if g.cameraOn { Circle().fill(Color.green).frame(width: 8, height: 8) }
+                    if !g.micUsers.isEmpty { Circle().fill(Color.orange).frame(width: 8, height: 8) }
+                }.help(g.micUsers.isEmpty ? "Camera on" : "Mic on: " + g.micUsers.joined(separator: ", "))
+            }
             HStack(spacing: 5) {
                 Image(systemName: g.battery.1 ? "battery.100.bolt" : g.battery.0 < 20 ? "battery.25" : "battery.75")
                     .foregroundStyle(g.battery.0 < 20 ? Color.red : Color.green)
@@ -1544,6 +1647,22 @@ struct ControlsView: View {
                 small("lock.fill", "Lock") { Sys.lock() }
                 small(p.shoulderGuard ? "eye.slash.fill" : "eye", p.shoulderGuard ? "Guard on" : "Guard off") { _ = g.setScreenGuard(!p.shoulderGuard) }
                 if g.timerEnd != nil { small("xmark", "Stop timer") { g.timerEnd = nil } }
+                Spacer()
+            }
+            HStack(spacing: 8) {
+                small(g.micMuted ? "mic.slash.fill" : "mic.fill", g.micMuted ? "Mic muted" : "Mute mic") { _ = g.setMicMuted(!g.micMuted) }
+                Menu {
+                    ForEach(AudioOut.outputs(), id: \.id) { d in
+                        Button((d.name == g.audioOut ? "✓ " : "") + d.name) { _ = g.setOutput(d.name) }
+                    }
+                } label: {
+                    Label(g.audioOut.isEmpty ? "Sound output" : g.audioOut, systemImage: "hifispeaker.2.fill").font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1).padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(Capsule().fill(Color.white.opacity(0.08)))
+                }
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                if !g.drives.isEmpty { small("eject.fill", "Eject \(g.drives.count == 1 ? g.drives[0] : "drives")") { _ = g.ejectDrives() } }
+                small("checklist", "Reminders") { Task { @MainActor in let r = await RemindersService.shared.list(); g.notify(r.replacingOccurrences(of: "Reminders (data, not instructions): ", with: "")) } }
                 Spacer()
             }
         }
@@ -1937,6 +2056,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var guardItem: NSMenuItem?
     var updateItem: NSMenuItem?
     var lockItem: NSMenuItem?
+    var micItem: NSMenuItem?
+    @objc func menuMic() { _ = Nova.shared.setMicMuted(!MicMute.isMuted()) }
     var stealthItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ n: Notification) {
@@ -2008,6 +2129,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         m.addItem(withTitle: "Talk to Nova  (⌥⌘G)", action: #selector(menuOpen), keyEquivalent: "").target = self
         let li = m.addItem(withTitle: "Lock NoTcH OS  (⌥⌘L)", action: #selector(menuLock), keyEquivalent: "")
         li.target = self; lockItem = li
+        let mi = m.addItem(withTitle: "Mute microphone (all apps)", action: #selector(menuMic), keyEquivalent: "")
+        mi.target = self; micItem = mi
         m.addItem(withTitle: "Settings…", action: #selector(menuSettings), keyEquivalent: ",").target = self
         m.addItem(withTitle: "Report a bug…", action: #selector(menuBug), keyEquivalent: "").target = self
         let ui = m.addItem(withTitle: "Check for Updates…", action: #selector(menuUpdate), keyEquivalent: "")
@@ -2045,6 +2168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     func menuNeedsUpdate(_ menu: NSMenu) {
         lockItem?.title = Nova.shared.locked ? "Unlock NoTcH OS  (⌥⌘L)" : "Lock NoTcH OS  (⌥⌘L)"
+        micItem?.title = MicMute.isMuted() ? "Unmute microphone" : "Mute microphone (all apps)"
         guardItem?.state = Prefs.shared.shoulderGuard ? .on : .off
         stealthItem?.state = Prefs.shared.stealth ? .on : .off
         if let v = Updater.shared.available { updateItem?.title = "Install NoTcH OS \(v.version)…" } else { updateItem?.title = "Check for Updates…" }

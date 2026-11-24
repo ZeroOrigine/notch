@@ -6,8 +6,8 @@
  <key>CFBundleIdentifier</key><string>com.notch.app</string>
  <key>CFBundleExecutable</key><string>Notch</string>
  <key>CFBundlePackageType</key><string>APPL</string>
- <key>CFBundleShortVersionString</key><string>6.1</string>
- <key>CFBundleVersion</key><string>13</string>
+ <key>CFBundleShortVersionString</key><string>6.2</string>
+ <key>CFBundleVersion</key><string>14</string>
  <key>LSMinimumSystemVersion</key><string>13.0</string>
  <key>CFBundleIconFile</key><string>AppIcon</string>
  <key>NSHighResolutionCapable</key><true/>
@@ -17,5 +17,8 @@
  <key>NSBluetoothAlwaysUsageDescription</key><string>NoTcH OS turns Bluetooth on and off for you.</string>
  <key>NSCalendarsUsageDescription</key><string>Nova reads your events (never changes them) for your briefing and when you ask about your day.</string>
  <key>NSCalendarsFullAccessUsageDescription</key><string>Nova reads your events (never changes them) for your briefing and when you ask about your day.</string>
+ <key>NSRemindersUsageDescription</key><string>Nova adds reminders you ask for and reads what is due.</string>
+ <key>NSRemindersFullAccessUsageDescription</key><string>Nova adds reminders you ask for and reads what is due.</string>
+ <key>NSDownloadsFolderUsageDescription</key><string>NoTcH OS tells you when a new download arrives.</string>
  <key>NSAppleEventsUsageDescription</key><string>NoTcH OS controls Music, Spotify, Mail and system settings for you.</string>
 </dict></plist>

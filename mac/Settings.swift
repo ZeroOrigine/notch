@@ -44,6 +44,12 @@ final class Prefs: ObservableObject {
     @Published var lockDuringCalls = Prefs.b("lockDuringCalls", true) { didSet { save("lockDuringCalls", lockDuringCalls) } }
     @Published var voiceID = UserDefaults.standard.string(forKey: "voiceID") ?? "" { didSet { save("voiceID", voiceID) } }
     @Published var voiceRate = UserDefaults.standard.object(forKey: "voiceRate") as? Double ?? 0.52 { didSet { save("voiceRate", voiceRate) } }
+    // 6.2
+    @Published var privacyLight = Prefs.b("privacyLight", true) { didSet { save("privacyLight", privacyLight) } }
+    @Published var downloadAlerts = Prefs.b("downloadAlerts", true) { didSet { save("downloadAlerts", downloadAlerts) } }
+    @Published var driveAlerts = Prefs.b("driveAlerts", true) { didSet { save("driveAlerts", driveAlerts) } }
+    @Published var fullChargeAlert = Prefs.b("fullChargeAlert", true) { didSet { save("fullChargeAlert", fullChargeAlert) } }
+    @Published var fullChargeLevel = (UserDefaults.standard.object(forKey: "fullChargeLevel") as? Int) ?? 100 { didSet { save("fullChargeLevel", fullChargeLevel) } }
     @Published var updateAlerts = Prefs.b("updateAlerts", true) { didSet { save("updateAlerts", updateAlerts) } }
     @Published var scale = (UserDefaults.standard.object(forKey: "scale") as? Double) ?? 0.8 { didSet { save("scale", scale) } }
     @Published var fixStyle = UserDefaults.standard.string(forKey: "fixStyle") ?? "fix spelling and grammar and make it clear" { didSet { save("fixStyle", fixStyle) } }
@@ -240,6 +246,17 @@ struct SettingsView: View {
             Section("Screen privacy") {
                 row("Screen guard", "Blurs your whole screen when a second face looks over your shoulder. Uses this Mac's camera, nothing leaves the Mac. Also in the menu bar, the Controls tab, or say “screen guard on”.", $p.shoulderGuard)
                 row("Hide NoTcH OS from screen sharing", "Screenshots and shared screens (Zoom, Teams, Meet) skip NoTcH OS and your chats with Nova. A few newer capture apps may still see it.", $p.stealth)
+            }
+            Section("Notch alerts") {
+                row("Mic and camera light", "A small orange (mic) or green (camera) light, and a quick note saying which app is using them.", $p.privacyLight)
+                row("New downloads", "A quick note when a file lands in Downloads. Say “show my download” to see it in Finder.", $p.downloadAlerts)
+                row("USB drives and SD cards", "A note when one is plugged in. Say “eject” or tap Eject in Controls to remove it safely.", $p.driveAlerts)
+                row("Battery charged", "Tells you when the battery reaches the level below, so you can unplug.", $p.fullChargeAlert)
+                if p.fullChargeAlert {
+                    Picker("Charged at", selection: $p.fullChargeLevel) {
+                        Text("80%").tag(80); Text("90%").tag(90); Text("100%").tag(100)
+                    }.pickerStyle(.segmented)
+                }
             }
             Section("The island") {
                 Picker("Island size", selection: $p.scale) {
