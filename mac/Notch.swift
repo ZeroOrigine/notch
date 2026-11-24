@@ -704,6 +704,8 @@ final class Nova: ObservableObject {
                 title = title.replacingOccurrences(of: #"\s+(at|on|by|in)\s*$"#, with: "", options: .regularExpression)
                     .trimmingCharacters(in: CharacterSet(charactersIn: " ,."))
             }
+            title = title.replacingOccurrences(of: #"\s*in (\d+|a|an|one|half an) ?(minutes?|mins?|hours?|hrs?|days?)"#, with: "", options: .regularExpression)
+                .trimmingCharacters(in: CharacterSet(charactersIn: " ,."))
             let when = body
             if !title.isEmpty {
                 Task { @MainActor in
