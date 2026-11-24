@@ -307,7 +307,7 @@ final class RemindersService {
             said = " for " + f.string(from: d)
         }
         do { try store.save(r, commit: true) } catch { return "Reminders did not save it: \(error.localizedDescription)" }
-        Log.add("Reminder added: \(t)\(said)")
+        Log.add("Reminder added (text not logged)")
         return "Reminder set\(said): \(t)"
     }
 

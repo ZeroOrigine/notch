@@ -389,6 +389,8 @@ final class Nova: ObservableObject {
         refresh()
         Log.add("Notch started")
         later(1.4) { self.notify(self.greeting() + ". Nova is ready.") }
+        // a mic muted in an earlier session stays muted in every app: say so, so nobody is silent on a call by surprise
+        later(6) { if MicMute.isMuted() { self.micMuted = true; self.showBanner("Your mic is muted in every app", .red, seconds: 5) } }
         fetchWeather()
     }
     func applyPrefs() {
@@ -895,7 +897,7 @@ final class Nova: ObservableObject {
         else if camNew { showBanner("Camera is on", .green, seconds: 3.5) }
     }
     func downloaded(_ u: URL) {
-        Log.add("Downloaded \(u.lastPathComponent)")
+        Log.add("New download (name not logged)")
         showBanner("Downloaded · \(u.lastPathComponent)", .blue, seconds: 4)
     }
     func driveMounted(_ u: URL?) {
@@ -1355,6 +1357,9 @@ struct NotchRoot: View {
 
     var header: some View {
         HStack(spacing: 12) {
+            if g.micMuted {
+                Image(systemName: "mic.slash.fill").font(.system(size: 12, weight: .bold)).foregroundStyle(.red).help("Mic is muted in every app")
+            }
             if !g.micUsers.isEmpty || g.cameraOn {
                 HStack(spacing: 4) {
                     if g.cameraOn { Circle().fill(Color.green).frame(width: 8, height: 8) }
