@@ -274,12 +274,21 @@ final class RemindersService {
 
     /// Finds a date and time in plain words: "at 5pm", "tomorrow at 9", "on Friday".
     static func when(_ text: String, now: Date = Date()) -> (Date, Bool)? {
+        let lower = text.lowercased()
+        // "in 20 minutes", "in 2 hours", "in an hour", "in 3 days": NSDataDetector misses these
+        if let m = lower.range(of: #"in (\d+|a|an|one|half an) ?(minutes?|mins?|hours?|hrs?|days?)"#, options: .regularExpression) {
+            let parts = lower[m].split(separator: " ").map(String.init)
+            let unit = parts.last ?? ""
+            let n: Double = lower[m].contains("half an") ? 0.5 : Double(parts.count > 1 ? parts[1] : "1") ?? 1
+            let secs = unit.hasPrefix("min") ? 60.0 : unit.hasPrefix("h") ? 3600.0 : 86400.0
+            return (now.addingTimeInterval(n * secs), true)
+        }
         guard !text.isEmpty, let det = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.date.rawValue),
               let m = det.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)), var d = m.date else { return nil }
-        let lower = text.lowercased()
         let hasTime = lower.range(of: #"\d\s*(am|pm|:\d\d)|\bat \d|noon|midnight|morning|evening|tonight"#, options: .regularExpression) != nil
         if !hasTime, let nine = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: d) { d = nine }
-        if d < now, !hasTime { d = Calendar.current.date(byAdding: .day, value: 1, to: d) ?? d }
+        // a time that has already passed today means the next one (5pm said at 9pm = tomorrow 5pm)
+        if d < now { d = Calendar.current.date(byAdding: .day, value: 1, to: d) ?? d }
         return (d, hasTime)
     }
 
